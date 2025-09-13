@@ -97,7 +97,6 @@ def RespondWithMedia(media_type: str, media_description: str, caption: str = "",
                 _logger.error(f"DB Transaction failed while entering media info in the DB")
                 responses.append(response)
 
-        return {"response": responses}
 
 
     return {"results": responses}
@@ -268,4 +267,5 @@ def stream_graph_updates(user_ph: str, user_input) -> dict:
                      final_response["metadata"] = last_message.usage_metadata
     
      print("=== STREAM COMPLETED ===")
+     _logger.info(final_response)
      return final_response
