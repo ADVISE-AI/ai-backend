@@ -1,0 +1,11 @@
+.venv/
+.env
+dataset/
+__pycache__/
+finetuning/
+media/
+
+sys_prompt.txt
+payload.txt
+
+.ipynb_checkpoints/
