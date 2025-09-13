@@ -94,7 +94,7 @@ def RespondWithMedia(media_type: str, media_description: str, caption: str = "",
                 _logger.info(f"Media_sent and DB entry made for media id: {id}")
                 responses.append(response)
             except Exception as e:
-                _logger.error(f"DB Transaction failed while entering media info in the DB")
+                _logger.error(f"DB Transaction failed while entering media info in the DB, EXCEPTION OCCURED: {str(e)}")
                 responses.append(response)
 
 
