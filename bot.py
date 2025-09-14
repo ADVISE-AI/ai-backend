@@ -14,8 +14,8 @@ from config import OPENAI_API_KEY, GOOGLE_API_KEY, logger
 from whatsapp import send_video
 from utils import search_db_tool
 from pydantic import BaseModel, Field
-from db import pool, engine, message
-from sqlalchemy import insert
+from db import pool, engine, message, conversation
+from sqlalchemy import insert, select
 from datetime import datetime
 import json
 import base64
@@ -37,7 +37,6 @@ class State(TypedDict):
     human_intervention_requested: bool
     waiting_for_human_response: bool
     human_response: str
-    
 
 class RespondWithMediaArgs(BaseModel):
     media_type: str = Field(
@@ -75,19 +74,29 @@ def RespondWithMedia(media_type: str, media_description: str, caption: str = "",
     for id in id_list:
         try:
             response = send_video(str(user_ph), id)
+            _logger.info(f"Send Media Response: {response}")
         except Exception as e:
             _logger.error(f"Failed to send media, media id: {id}")
             return {"response": str(e)}
 
         with engine.begin() as conn:
             try:
+                conversation_id = None
+                result_set = conn.execute(select(conversation.c.id).where(conversation.c.phone == str(user_ph)))
+                conversation_ids = result_set.mappings().first()
+
+                if conversation_ids:
+                    conversation_id = conversation_ids['id']
+ 
                 rows = {
+                    "conversation_id": conversation_id,
                     "direction": "outbound",
-                    "sender_type": "AI",
+                    "sender_type": "ai",
                     "external_id": response['messages'][0]['id'],
                     "has_text": True if len(caption)>0 else False,
-                    "message": caption if len(caption)>0 else None,
+                    "message_text": caption if len(caption)>0 else None,
                     "media_info": json.dumps({"media_id": str(id), "mime_type": "video/mp4", "media_description":media_description}),
+                    "status": "pending", #To be changed later
                     "provider_ts": datetime.utcnow().isoformat()
                 }
                 conn.execute(insert(message).values(rows))

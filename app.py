@@ -159,49 +159,56 @@ def webhook():
 
 
 def respond_to_user(user_input, user_ph: str, message_id: str):
-    ai_resp = stream_graph_updates(user_ph, user_input)
-    ai_resp_message = ai_resp.get("content")
-    ai_resp_metadata = ai_resp.get("metadata")
-    
-    typing_indicator(message_id)
-    time.sleep(5)
-
-    if ai_resp_message and ai_resp_message.strip():
-         response = send_message(user_ph, ai_resp_message)
-
-         with engine.begin() as conn:
-             try: 
-                msg_id = response["messages"][0]['id']
-                has_text = True
-                msg = ai_resp_message
-                timestamp = datetime.utcnow().isoformat()
-
-                result_set = conn.execute(select(conversation.c.id).where(conversation.c.phone == str(user_ph)))
-                conversation_ids = result_set.mappings().first()
+    try:
+        with engine.begin() as conn:
+            result_set = conn.execute(select(conversation.c.id).where(conversation.c.phone == str(user_ph)))
+            conversation_ids = result_set.mappings().first()
+            if conversation_ids:
                 conversation_id = conversation_ids['id']
-                rows = {
-                    "conversation_id": conversation_id,
-                    "direction": "outbound", 
-                    "sender_type": "ai", 
-                    "external_id": str(msg_id),
-                    "has_text": has_text, 
-                    "message_text": msg if msg and type(msg) is str else None,
-                    "provider_ts": timestamp
-                }
-             
-                conn.execute(insert(message).values(rows))
-             except Exception as e:
-                _logger.error(f"Database insert Failed in {respond_to_user.__name__}. ERROR CAUSE: {e}")
-             
-    return {
-         "User_Data": {
-             "Phone": user_ph,
-             "message": user_input,
-             "message_id": message_id
-         },
-         "AI_Response": ai_resp_message,
-         "Metadata": ai_resp_metadata
-     }
+                ai_resp = stream_graph_updates(user_ph, user_input)
+                ai_resp_message = ai_resp.get("content")
+                ai_resp_metadata = ai_resp.get("metadata")
+
+                typing_indicator(message_id)
+                time.sleep(5)
+
+                if ai_resp_message and ai_resp_message.strip():
+                     response = send_message(user_ph, ai_resp_message)
+
+                     try: 
+                        msg_id = response["messages"][0]['id'] if response else None
+                        has_text = True
+                        msg = ai_resp_message
+                        timestamp = datetime.utcnow().isoformat()
+
+                        rows = {
+                            "conversation_id": conversation_id,
+                            "direction": "outbound", 
+                            "sender_type": "ai", 
+                            "external_id": str(msg_id),
+                            "has_text": has_text, 
+                            "message_text": msg if msg and type(msg) is str else None,
+                            "provider_ts": timestamp
+                        }
+
+                        conn.execute(insert(message).values(rows))
+                     except Exception as e:
+                        _logger.error(f"Database insert Failed in {respond_to_user.__name__}. ERROR CAUSE: {e}")
+
+                return {
+                     "User_Data": {
+                         "Phone": user_ph,
+                         "message": user_input,
+                         "message_id": message_id
+                     },
+                     "AI_Response": ai_resp_message,
+                     "Metadata": ai_resp_metadata
+                 }
+            else:
+                _logger.error(f"No conversation id found for the user phone: {user_ph}")
+
+    except Exception as e:
+        _logger.error(f"DB Connection failed: Exception: {e}")
 
    
 

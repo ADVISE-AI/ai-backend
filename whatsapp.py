@@ -34,7 +34,7 @@ def _handle_error(error_obj: Dict) -> None:
     _logger.error(f"Error {error_code}: {message} - {error_message}")
 
 
-def send_message(to: str, message: str) -> bool:
+def send_message(to: str, message: str):
     url = f"{API_BASE}/messages"
     data = {
         "messaging_product": "whatsapp",
@@ -46,24 +46,24 @@ def send_message(to: str, message: str) -> bool:
     try:
         response = requests.post(url, headers=_headers(), json=data)
         _logger.info("Message send response: %s", response.status_code)
+        resp_data = None
+        try:
+            resp_data = response.json()
+        except Exception as e:
+            _logger.error(f"Exception: {e}")
+            _logger.error("Response not valid JSON: %s", response.text)
 
         if response.ok:
             _logger.info("Message sent successfully to %s", to)
             _logger.debug("Response JSON: %s", response.json())
-            return response.json()
-
-        _logger.error("Failed to send message. Status: %s", response.status_code)
-        try:
-            error_obj = response.json()
-            _logger.error("Error response: %s", json.dumps(error_obj, indent=2))
-            _handle_error(error_obj)
-        except ValueError:
-            _logger.error("Response not valid JSON: %s", response.text)
-        return False
+            return resp_data
+        else:
+            _logger.error("Failed to send message. Status: %s", response.status_code)
+            _logger.error("Error response: %s", json.dumps(resp_data, indent=2))
+            return resp_data
 
     except requests.RequestException as e:
         _logger.exception("HTTP request failed: %s", str(e))
-        return False
 
 
 def typing_indicator(msg_id: str) -> bool:
@@ -154,20 +154,20 @@ def send_video(user_ph: str, media_id: str, caption: str = "") -> dict:
         if response.ok:
             _logger.info("Video %s sent successfully to %s", media_id, user_ph)
             _logger.debug("Response JSON: %s", response.json())
-            return response
+            return response.json()
         else:
             _logger.error("Failed to send video %s. Status: %s", media_id, response.status_code)
             try:
                 error_obj = response.json()
                 _logger.error("Error response: %s", json.dumps(error_obj, indent=2))
                 _handle_error(error_obj)
-                return response
+                return response.json()
             except ValueError:
                 _logger.error("Response not valid JSON: %s", response.text)
-                return response
+                return response.json()
     except requests.RequestException as e:
         _logger.exception("Failed to send video %s: %s", media_id, str(e))
-        return response
+        return response.json()
 
 
 
