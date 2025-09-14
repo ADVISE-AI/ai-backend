@@ -95,7 +95,7 @@ def RespondWithMedia(media_type: str, media_description: str, caption: str = "",
                     "external_id": response['messages'][0]['id'],
                     "has_text": True if len(caption)>0 else False,
                     "message_text": caption if len(caption)>0 else None,
-                    "media_info": json.dumps({"media_id": str(id), "mime_type": "video/mp4", "media_description":media_description}),
+                    "media_info": json.dumps({"id": str(id), "mime_type": "video/mp4", "description":media_description}),
                     "status": "pending", #To be changed later
                     "provider_ts": datetime.utcnow().isoformat()
                 }

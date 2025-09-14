@@ -58,7 +58,7 @@ def webhook():
                     "mime_type": _from["mime_type"]
                 }
 
-                media_info = {"type": msg['content_type'], "media_id": _from['media_id'], "media_description": ""}
+                media_info = {"id": _from['media_id'], "mime_type": msg["mime_type"], "description": ""}
 
                 has_text = True 
             
