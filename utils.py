@@ -2,7 +2,7 @@ import os
 from glob import glob
 from config import DB_URL, logger
 from whatsapp import upload_video
-from config import conn
+from db import conn
 _logger = logger(__name__)
 
 

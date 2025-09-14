@@ -1,5 +1,5 @@
 from psycopg import Connection
-import sqlalchemy as db
+import sqlalchemy 
 from sqlalchemy import create_engine, Table, MetaData, insert, update, delete
 from sqlalchemy.orm import Session
 from config import DB_URL
