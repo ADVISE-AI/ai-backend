@@ -7,14 +7,6 @@ from whatsapp import upload_video
 _logger = logger(__name__)
 
 
-MEDIA_PATHS = {
-    "anniversary": os.getenv("MEDIA_ANNIVERSARY"),
-    "birthday": os.getenv("MEDIA_BIRTHDAY"), 
-    "wedding_2d": os.getenv("MEDIA_WEDDING_2D"),
-    "wedding_2d_caricature": os.getenv("MEDIA_WEDDING_2D_CARICATURE"),
-    "wedding_3d_caricature": os.getenv("MEDIA_WEDDING_3D_CARICATURE"), 
-} 
-
 def refactor_dict(data: dict) -> dict: 
     if "entry" not in data: return {"Error": "data not valid"}
     

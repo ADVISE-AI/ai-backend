@@ -14,7 +14,7 @@ from config import OPENAI_API_KEY, GOOGLE_API_KEY, logger
 from whatsapp import send_video
 from utils import search_db_tool
 from pydantic import BaseModel, Field
-from db import pool, engine, message, conversation
+from db import conn, engine, message, conversation
 from sqlalchemy import insert, select
 from datetime import datetime
 import json
@@ -24,7 +24,7 @@ import requests
 _logger = logger(__name__)
 
 try:
-    checkpointer = PostgresSaver(pool)
+    checkpointer = PostgresSaver(conn)
     checkpointer.setup()
     _logger.info("Langgraph DB setup successfully")
 except Exception as e:
