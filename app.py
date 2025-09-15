@@ -77,7 +77,7 @@ def webhook():
                     "data": dl_content['data'], 
                     "category":abstracted_data['category'],
                     "content_type": dl_content['content_type'],
-                    "mime_type": abstracted_data["mime_type"],
+                    "mime_type": _front["mime_type"],
                 }
 
                 media_info = {"id": _from['media_id'], "mime_type": msg["mime_type"], "description": ""}
