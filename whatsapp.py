@@ -198,6 +198,7 @@ def download_media(media_id: str) -> Optional[Dict]:
                 return {
                     "content_type": dl_resp.headers.get("Content-Type"),
                     "data": dl_resp.content,
+                    "mime_type": response_data["mime_type"]
                 }
             else:
                 _logger.error("Failed to download media for %s. Status: %s", media_id, dl_resp.status_code)

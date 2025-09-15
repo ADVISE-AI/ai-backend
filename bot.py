@@ -226,7 +226,7 @@ def stream_graph_updates(user_ph: str, user_input) -> dict:
 
      content = None
 
-     if type(user_input) is dict:
+     if type(user_input) is dict and user_input["context"] is False:
         
          category = user_input["category"]
          data_string = base64.b64encode(user_input['data']).decode("utf-8")
@@ -246,6 +246,29 @@ def stream_graph_updates(user_ph: str, user_input) -> dict:
             content_block
          ]
          _logger.info(f"Media category: {category}\n MIME type: {mime_type}\n Data String: {data_string}")
+
+     elif type(user_input) is dict and user_input["context"] is True:
+        
+        category = user_input["category"]
+        data_string = base64.b64encode(user_input['data']).decode("utf-8")
+        mime_type = user_input["mime_type"]
+        content_block = {
+             "type": category,
+             "source_type": "base64",
+             "data": data_string,
+             "mime_type": mime_type,
+        }
+
+        content = [
+             {
+                 "type": "text", 
+                 "text": "Process the media content and reply to the user accordingly"
+             },
+            content_block
+        ]
+        _logger.info(f"Media category: {category}\n MIME type: {mime_type}\n Data String: {data_string}")
+
+
      elif type(user_input) is str:
          content = user_input
     

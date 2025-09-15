@@ -47,15 +47,37 @@ def webhook():
 
             responded = None
             if _class == "text":
-                msg = _from["message"]
+                text = _from["message"]
                 has_text = True
+
+                if abstracted_data["context"] is not None:
+                    with engine.begin() as conn:
+                        result = conn.execute(select(message.c.media_info).where(message.c.external_id == str(abstracted_data["context"]["id"])))
+
+                        media_info = result.first()
+                        media_id = json.loads(media_info[0])["id"]
+
+                        media_data = download_media(media_id)
+
+                        msg = {
+                            "context": True,
+                            "data": media_data['data'], 
+                            "mime_type": media_data["mime_type"],
+                            "category": "video",
+                            "message": text
+                        }
+                else:
+                    msg = text
+                
             elif _class == "media":
+                
                 dl_content = download_media(_from['media_id'])
                 msg = {
+                    "context": False,
                     "data": dl_content['data'], 
                     "category":abstracted_data['category'],
                     "content_type": dl_content['content_type'],
-                    "mime_type": _from["mime_type"]
+                    "mime_type": media_data["mime_type"],
                 }
 
                 media_info = {"id": _from['media_id'], "mime_type": msg["mime_type"], "description": ""}

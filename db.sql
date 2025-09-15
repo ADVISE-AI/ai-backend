@@ -95,3 +95,4 @@ CREATE TRIGGER trg_notify_new_message_entry
 AFTER INSERT ON "message"
 FOR EACH ROW
 EXECUTE PROCEDURE notify_new_message_entry();
+

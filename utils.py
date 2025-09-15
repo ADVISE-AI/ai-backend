@@ -18,7 +18,7 @@ def refactor_dict(data: dict) -> dict:
         user_name = value["contacts"][0]["profile"]["name"]
         msg_id = value["messages"][0]["id"]
         category = value["messages"][0]["type"]
-        
+        context = value["messages"][0]["context"]["id"] if "context" in value["messages"][0] else None        
         if category == "text":
             message = value["messages"][0]["text"]["body"]
             return {
@@ -33,9 +33,18 @@ def refactor_dict(data: dict) -> dict:
                 "message_id": msg_id,
                 "message": message,
                 },
+            "context": context
             }
+
+
         elif category in ["audio", "image", "video"]:
-            media = value["messages"][0]["image"] if category == "image" else value["messages"][0]["audio"]
+             if category == "image":
+                media = value["messages"][0]["image"]
+             elif category == "audio":
+                media = value["messages"][0]["audio"]
+             else:  # video
+                media = value["messages"][0]["video"]
+
             mime_type = media["mime_type"]
             media_id = media["id"]
             return {
@@ -50,12 +59,13 @@ def refactor_dict(data: dict) -> dict:
                 "message_id": msg_id,
                 "mime_type": mime_type,
                 "media_id": media_id,
-                }
+                },
+            "context": context
             }
         
         else:
             _logger.error("Received data format not supported!")
-            logger.info(f"Data received: {data}")
+            _logger.info(f"Data received: {data}")
             return {
                 "class": category,
                 "category": None,
