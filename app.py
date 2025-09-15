@@ -52,7 +52,7 @@ def webhook():
 
                 if abstracted_data["context"] is not None:
                     with engine.begin() as conn:
-                        result = conn.execute(select(message.c.media_info).where(message.c.external_id == str(abstracted_data["context"]["id"])))
+                        result = conn.execute(select(message.c.media_info).where(message.c.external_id == abstracted_data["context"]["id"]))
 
                         media_info = result.first()
                         media_id = json.loads(media_info[0])["id"]
