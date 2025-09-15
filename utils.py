@@ -38,11 +38,11 @@ def refactor_dict(data: dict) -> dict:
 
 
         elif category in ["audio", "image", "video"]:
-             if category == "image":
+            if category == "image":
                 media = value["messages"][0]["image"]
-             elif category == "audio":
+            elif category == "audio":
                 media = value["messages"][0]["audio"]
-             else:  # video
+            else:  # video
                 media = value["messages"][0]["video"]
 
             mime_type = media["mime_type"]
