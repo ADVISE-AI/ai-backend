@@ -402,8 +402,20 @@ def stream_graph_updates(user_ph: str, user_input) -> dict:
         mime_type = user_input["mime_type"]
         message_text = user_input.get("message", "")
 
-       
-        content = f"User replied to your {category}: '{message_text}'. Respond appropriately based on their feedback."
+        content_block = {
+            "type": "media" if category in ["video", "audio"] else category,
+            "data": data_string,
+            "mime_type": mime_type,
+        }
+
+        content = [
+            {"type": "text", "text": f"""he user’s reply message is: {message_text}
+            Generate a response that takes into account both the content of the video and the user’s reply. 
+            Respond naturally, as if continuing the conversation, without repeating the video description. 
+            If the user’s reply asks a question, answer it using the video context. 
+            If it’s just a reaction, respond in a relevant, concise way."""
+}
+        ]
         
         _logger.info(f"Contextual reply processed - Category: {category}, Message: {message_text}")
 
