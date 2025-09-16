@@ -29,7 +29,7 @@ def webhook():
         data = request.get_json()
         
         abstracted_data = refactor_dict(data)
-
+        time.sleep(2)
         if abstracted_data["type"] == "inbound":
             
             _class = abstracted_data['class']
@@ -46,26 +46,42 @@ def webhook():
             media_info = None
 
             responded = None
+
+            if is_duplicate_message(msg_id, user_ph):
+                _logger.info(f"Duplicate message {msg_id} ignored")
+                return "OK", 200
+            
+
             if _class == "text":
                 text = _from["message"]
                 has_text = True
 
                 if abstracted_data["context"] is not None:
                     with engine.begin() as conn:
-                        result = conn.execute(select(message.c.media_info).where(message.c.external_id == abstracted_data["context"]["id"]))
+                        context_msg_id = abstracted_data["context"]["id"]
+                        result = conn.execute(select(message.c.media_info).where(message.c.external_id == f"{context_msg_id}"))
 
-                        media_info = result.first()
-                        media_id = json.loads(media_info[0])["id"]
+                        media_info_row = result.first()
+                        if media_info_row and media_info_row[0]:
+                            try:
+                                media_info = json.loads(media_info_row[0])
+                                media_id = media_info["id"]
 
-                        media_data = download_media(media_id)
+                                media_data = download_media(media_id)
 
-                        msg = {
-                            "context": True,
-                            "data": media_data['data'], 
-                            "mime_type": media_data["mime_type"],
-                            "category": "video",
-                            "message": text
-                        }
+                                msg = {
+                                    "context": True,
+                                    "data": media_data['data'], 
+                                    "mime_type": media_data["mime_type"],
+                                    "category": "media",
+                                    "message": text
+                                }
+                            except (json.JSONDecodeError, KeyError) as e:
+                                _logger.error(f"Error processing context media info: {e}")
+                                msg = text
+                        else:
+                            _logger.warning(f"No media info found for context message ID: {context_msg_id}")
+                            msg = text
                 else:
                     msg = text
                 
@@ -77,12 +93,12 @@ def webhook():
                     "data": dl_content['data'], 
                     "category":abstracted_data['category'],
                     "content_type": dl_content['content_type'],
-                    "mime_type": _front["mime_type"],
+                    "mime_type": _from["mime_type"],
                 }
 
                 media_info = {"id": _from['media_id'], "mime_type": msg["mime_type"], "description": ""}
 
-                has_text = True 
+                has_text = False
             
             with engine.begin() as conn:
                 try:
@@ -143,10 +159,8 @@ def webhook():
                 except Exception as e:
                     _logger.error(f"Database insert failed (inbound): {str(e)}")
 
-
+            time.sleep(1)
             respond_to_user(msg, user_ph, msg_id)
-            _logger.info("Response sent on Whatsapp.")
-
 
         elif abstracted_data["type"] == "statuses":
             with engine.begin() as conn:
@@ -179,6 +193,27 @@ def webhook():
             return "Invalid Token", 403
 
 
+message_cache = {}
+CACHE_DURATION = 30  # seconds
+
+def is_duplicate_message(msg_id, user_ph):
+    """Check if message was already processed recently"""
+    cache_key = f"{user_ph}_{msg_id}"
+    current_time = time.time()
+    
+    if cache_key in message_cache:
+        last_processed = message_cache[cache_key]
+        if current_time - last_processed < CACHE_DURATION:
+            return True
+    
+    message_cache[cache_key] = current_time
+    
+    # Clean old entries
+    expired_keys = [k for k, v in message_cache.items() if current_time - v > CACHE_DURATION]
+    for k in expired_keys:
+        del message_cache[k]
+    
+    return False
 
 def respond_to_user(user_input, user_ph: str, message_id: str):
     try:
@@ -187,15 +222,21 @@ def respond_to_user(user_input, user_ph: str, message_id: str):
             conversation_ids = result_set.mappings().first()
             if conversation_ids:
                 conversation_id = conversation_ids['id']
-                ai_resp = stream_graph_updates(user_ph, user_input)
-                ai_resp_message = ai_resp.get("content")
-                ai_resp_metadata = ai_resp.get("metadata")
-
+                try:
+                    ai_resp = stream_graph_updates(user_ph, user_input)
+                    ai_resp_message = ai_resp.get("content")
+                    ai_resp_metadata = ai_resp.get("metadata")
+                except Exception as e:
+                    _logger.error(f"Stream graph update function returned shit!:{e}")
                 typing_indicator(message_id)
                 time.sleep(5)
 
                 if ai_resp_message and ai_resp_message.strip():
-                     response = send_message(user_ph, ai_resp_message)
+                     try:
+                         response = send_message(user_ph, ai_resp_message)
+                         _logger.info("Response sent on Whatsapp.")
+                     except Exception as e:
+                         _logger.error(e)
 
                      try: 
                         msg_id = response["messages"][0]['id'] if response else None

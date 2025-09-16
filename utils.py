@@ -2,7 +2,9 @@ import os
 from glob import glob
 from config import DB_URL, logger
 from whatsapp import upload_video
-from db import conn
+from db import sample_library, engine
+from sqlalchemy import select, and_
+
 _logger = logger(__name__)
 
 
@@ -18,7 +20,8 @@ def refactor_dict(data: dict) -> dict:
         user_name = value["contacts"][0]["profile"]["name"]
         msg_id = value["messages"][0]["id"]
         category = value["messages"][0]["type"]
-        context = value["messages"][0]["context"]["id"] if "context" in value["messages"][0] else None        
+        context = value["messages"][0]["context"] if "context" in value["messages"][0] else None
+
         if category == "text":
             message = value["messages"][0]["text"]["body"]
             return {
@@ -33,7 +36,7 @@ def refactor_dict(data: dict) -> dict:
                 "message_id": msg_id,
                 "message": message,
                 },
-            "context": context
+            "context": context            
             }
 
 
@@ -92,13 +95,11 @@ def refactor_dict(data: dict) -> dict:
 
 def search_db_tool(media_type:str, media_description: str) -> list:
     id_list = []
-    with conn:
-        with conn.cursor() as curr:
-            sql_query = """SELECT media_id FROM sample_media_library WHERE media_type = %s AND media_description = %s"""
-            curr.execute(sql_query, (media_type.lower(), media_description.lower()))
-            result = curr.fetchall()
+    with engine.begin() as conn:
+        result = conn.execute(select(sample_library.c.media_id).where(and_(sample_library.c.media_type == media_type, sample_library.c.media_description == media_description)))
+        media_id = result.fetchall()
 
-    for row in result:
+    for row in media_id:
         id_list.append(row[0])
     
     return id_list;
