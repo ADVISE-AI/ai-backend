@@ -194,15 +194,6 @@ def gemini_node(state: State):
     turn_count = state.get("conversation_turn", 0)
     last_timestamp = state.get("turn_timestamp", 0)
     
-    # Prevent rapid-fire processing (less than 2 seconds apart)
-    if current_time - last_timestamp < 2:
-        _logger.warning("Preventing duplicate processing - too soon")
-        return {
-            "messages": [],  # Don't add new messages
-            "conversation_turn": turn_count,
-            "turn_timestamp": current_time
-        }
-    
     # Limit conversation turns
     if turn_count >= 5:
         _logger.warning("Max conversation turns reached, ending")
@@ -383,12 +374,22 @@ def stream_graph_updates(user_ph: str, user_input) -> dict:
         category = user_input["category"]
         data_string = base64.b64encode(user_input["data"]).decode("utf-8")
         mime_type = user_input["mime_type"]
+        
+        content_block= None
 
-        content_block = {
-            "type": "media" if category in ["video", "audio"] else category,
-            "data": data_string,
-            "mime_type": mime_type,
-        }
+        if category == "image":
+            content_block = {
+                "type": "image_url", 
+                "image_url": f"data:{mime_type}:base64,{data_string}"
+            }
+        elif category in ["audio", "video"]:
+            content_block = {
+                
+                "type": "media",
+                "data": data_string,  # Use base64 string directly
+                "mime_type": mime_type.split(";")[0].strip() if "codec=opus" in mime_type else mime_type
+
+            }
 
         content = [
             {"type": "text", "text": f"User sent a {category}. Process this appropriately."},
