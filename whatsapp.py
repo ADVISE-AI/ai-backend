@@ -138,19 +138,35 @@ def upload_video(file_path: str) -> Optional[str]:
             files["file"][1].close()
 
 
-def send_video(user_ph: str, media_id: str, caption: str = "") -> dict:
+def send_media(media_type: str, user_ph: str, media_id: str, caption: str = "") -> dict:
     url = f"{API_BASE}/messages"
+
+
+    media_dict = None
+
+    if media_type == "audio":
+        media_dict = {
+            "id": media_id
+        }
+
+    elif media_type in ["image", "video"]:
+        media_dict = {
+            "id": media_id, 
+            "caption": caption
+        }
+            
     data = {
         "messaging_product": "whatsapp",
         "recipient_type": "individual",
         "to": user_ph,
-        "type": "video",
-        "video": {"id": media_id, "caption": caption},
+        "type": media_type,
+        f"{media_type}": media_dict
     }
 
     try:
         response = requests.post(url, headers=_headers(), json=data)
         _logger.info("Video send response for media %s: %s", media_id, response.status_code)
+        _logger.info(f"RESPONSE: {response.json()}")
         if response.ok:
             _logger.info("Video %s sent successfully to %s", media_id, user_ph)
             _logger.debug("Response JSON: %s", response.json())

@@ -93,16 +93,14 @@ def refactor_dict(data: dict) -> dict:
     return {"Error": "unhandled payload", "raw": value}
 
 
-def search_db_tool(media_type:str, media_description: str) -> list:
+def search_db_tool(media_file_type) -> list:
     id_list = []
     with engine.begin() as conn:
-        result = conn.execute(select(sample_library.c.media_id).where(and_(sample_library.c.media_type == media_type, sample_library.c.media_description == media_description)))
+        result = conn.execute(select(sample_library.c.media_id).where(sample_library.c.media_file_type == media_file_type))
         media_id = result.fetchall()
 
     for row in media_id:
         id_list.append(row[0])
     
     return id_list;
-
-
 

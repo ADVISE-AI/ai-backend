@@ -4,6 +4,9 @@ dataset/
 __pycache__/
 finetuning/
 media/
+db_mgmt.py
+gemini
+gpt_sys_prompt.txt
 
 sys_prompt.txt
 payload.txt

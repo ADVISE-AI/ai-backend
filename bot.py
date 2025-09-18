@@ -12,7 +12,7 @@ from langchain_core.tools import tool, InjectedToolCallId
 from langgraph.types import interrupt, Command
 from langgraph.checkpoint.postgres import PostgresSaver
 from config import OPENAI_API_KEY, GOOGLE_API_KEY, DB_URL, logger
-from whatsapp import send_video
+from whatsapp import send_media
 from utils import search_db_tool
 from pydantic import BaseModel, Field
 from db import engine, message, conversation
@@ -59,43 +59,24 @@ class State(TypedDict):
     last_media_hash: str  # Track processed media
     turn_timestamp: float   
 
-
-class RespondWithMediaArgs(BaseModel):
-    media_type: str = Field(
-        ...,
-        description="One of: 'wedding', 'anniversary', 'birthday'."
-    )
-    media_description: str = Field(
-        ...,
-        description=(
-            "If media_type = 'wedding' → '2d sample' OR '3d sample with caricature'. "
-            "If media_type = 'anniversary' or 'birthday' → '2d with caricature'."
-        )
-    )
-    caption: str = Field(
-        "",
-        description="Optional caption for the video."
-    )
-
-@tool("RespondWithMedia", args_schema=RespondWithMediaArgs)
-def RespondWithMedia(media_type: str, media_description: str, caption: str = "", *,config: RunnableConfig) -> dict:
+@tool("RespondWithMedia")
+def RespondWithMedia(media_file_type: str, caption: str = "", *,config: RunnableConfig) -> dict:
     """
-    Send the user WhatsApp videos.
+    Send the user WhatsApp media based on file type.
     Args:
-       
-        media_type: 'wedding', 'anniversary', or 'birthday'.
-        media_description: 
-            - if media_type = 'wedding' → '2d sample' OR '3d sample with caricature'
-            - if anniversary/birthday → '2d with caricature'
-        user_ph: Not to be handled by the llm
-        caption: optional caption for the video
+        media_file_type: Type of media file to send ('video', 'image', 'audio')
+        caption: optional caption for the media
+
+    Always use exact values: "video", "image", or "audio"
     """
-    id_list = search_db_tool(str(media_type), str(media_description))
+    id_list = search_db_tool(str(media_file_type))
     user_ph = config.get("configurable", {}).get("thread_id")
     responses = []
+
     for id in id_list:
         try:
-            response = send_video(str(user_ph), id)
+            time.sleep(1)
+            response = send_media(str(media_file_type), str(user_ph), id)
             _logger.info(f"Send Media Response: {response}")
 
         except Exception as e:
@@ -118,7 +99,7 @@ def RespondWithMedia(media_type: str, media_description: str, caption: str = "",
                     "external_id": response['messages'][0]['id'],
                     "has_text": True if len(caption)>0 else False,
                     "message_text": caption if len(caption)>0 else None,
-                    "media_info": json.dumps({"id": str(id), "mime_type": "video/mp4", "description":media_description}),
+                    "media_info": json.dumps({"id": str(id), "mime_type": "video/mp4", "description":"NO DESCRIPTION"}),
                     "status": "pending", #To be changed later
                     "provider_ts": datetime.utcnow().isoformat()
                 }
@@ -378,10 +359,14 @@ def stream_graph_updates(user_ph: str, user_input) -> dict:
         content_block= None
 
         if category == "image":
+            if not mime_type.startswith("image/"):
+                _logger.warning(f"Iavalid image MIME type: {mime_type}, defaulting to image/jpeg")
+                mime_type = "image/jpeg"
             content_block = {
                 "type": "image_url", 
-                "image_url": f"data:{mime_type}:base64,{data_string}"
+                "image_url": f"data:{mime_type};base64,{data_string}"
             }
+
         elif category in ["audio", "video"]:
             content_block = {
                 
