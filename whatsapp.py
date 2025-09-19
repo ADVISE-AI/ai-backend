@@ -164,6 +164,7 @@ def send_media(media_type: str, user_ph: str, media_id: str, caption: str = "") 
     }
 
     try:
+        _logger.info(f"DATA BEFORE SENDING! URL:{url}, HEADERS: {_headers()}, DATA:{data}")
         response = requests.post(url, headers=_headers(), json=data)
         _logger.info("Video send response for media %s: %s", media_id, response.status_code)
         _logger.info(f"RESPONSE: {response.json()}")

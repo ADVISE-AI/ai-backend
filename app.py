@@ -27,6 +27,7 @@ _logger = logger(__name__)
 def webhook():
     if request.method == 'POST':
         data = request.get_json()
+        _logger.info(f"RECEIVED WEBHOOK DATA: {json.dumps(data, indent = 2)}")
         
         abstracted_data = refactor_dict(data)
         time.sleep(2)
