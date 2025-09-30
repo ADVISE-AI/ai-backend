@@ -16,18 +16,16 @@ def send_media_tool(media_description: str, user_ph, caption = "") -> dict:
         select(sample_library.c.media_id, sample_library.c.media_file_type)
         .where(sample_library.c.media_description == media_description)
     )
-        rows = result.fetchall()
+        rows = result.mappings().all()
 
     for row in rows:
         try:
 
             time.sleep(1)
             response = send_media(row["media_file_type"], str(user_ph), row["media_id"])
-
             _logger.info(f"Send Media Response: {response}")
         except Exception as e:
-
-            _logger.error(f"Failed to send media, media id: {id}")
+            _logger.error(f"Failed to send media, media id: {row['media_id']}")
 
             return {"response": str(e)}
 
@@ -56,13 +54,13 @@ def send_media_tool(media_description: str, user_ph, caption = "") -> dict:
                     "external_id": response['messages'][0]['id'],
                     "has_text": True if len(caption)>0 else False,
                     "message_text": caption if len(caption)>0 else None,
-                    "media_info": json.dumps({"id": str(id), "mime_type": mime_type, "description":"NO DESCRIPTION"}),
+                    "media_info": json.dumps({"id": str(row['media_id']), "mime_type": mime_type, "description":"NO DESCRIPTION"}),
                     "status": "pending", #To be changed later
                     "provider_ts": datetime.utcnow().isoformat()
                 }
 
                 conn.execute(insert(message).values(rows))
-                _logger.info(f"Media_sent and DB entry made for media id: {id}")
+                _logger.info(f"Media_sent and DB entry made for media id: {row['media_id']}")
 
                 responses.append(response)
             except Exception as e:

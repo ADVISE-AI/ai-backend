@@ -1,6 +1,6 @@
 from flask import Blueprint, request
 from config import logger, VERIFY_TOKEN
-from utility import refactor_dict, is_duplicate_message, message_router
+from utility import normalize_webhook_payload, is_duplicate_message, message_router
 import json
 
 webhook_bp = Blueprint('webhook', __name__)
@@ -12,18 +12,18 @@ def webhook():
         data = request.get_json()
         _logger.info(f"RECEIVED WHATSAPP WEBHOOK DATA: {json.dumps(data, indent = 2)}")
 
-        clean_data = refactor_dict(data)
+        normalized_data = normalize_webhook_payload(data)
 
-        if clean_data["type"] == "inbound":
+        if normalized_data["type"] == "inbound":
 
-            if is_duplicate_message(clean_data["from"]["message_id"], clean_data["from"]["phone"]):
-                   _logger.info(f"Duplicate message {clean_data['from']['message_id']} ignored")
+            if is_duplicate_message(normalized_data["from"]["message_id"], normalized_data["from"]["phone"]):
+                   _logger.info(f"Duplicate message {normalized_data['from']['message_id']} ignored")
                    return "OK", 200
-               
-            message_router(clean_data)
-        
-        elif clean_data["type"] == "status":
-            _logger.info(f"Message status update received: {json.dumps(clean_data, indent=2)}")
+
+            message_router(normalized_data)
+
+        elif normalized_data["type"] == "status":
+            _logger.info(f"Message status update received: {json.dumps(normalized_data, indent=2)}")
             pass
 
         return "OK", 200

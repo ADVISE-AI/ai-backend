@@ -8,7 +8,7 @@ from .message_router import message_router
 from .store_message import store_user_message, store_operator_message, sync_operator_message_to_graph
 
 
-from .whatsapp_payload_normalizer import refactor_dict
+from .whatsapp_payload_normalizer import normalize_webhook_payload
 
 __all__ = [
     'content_formatter',
@@ -19,7 +19,7 @@ __all__ = [
     'store_user_message',
     'store_operator_message',
     'sync_operator_message_to_graph',
-    'refactor_dict',
+    'normalize_webhook_payload',
 ]
 
 version = '1.0.0'

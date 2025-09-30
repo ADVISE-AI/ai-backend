@@ -118,15 +118,21 @@ def stream_graph_updates(user_ph: str, user_input: dict) -> dict:
     content = None
     config = {"configurable": {"thread_id": user_ph}}
     
+    import time
+    timings = {}
+    
+    t0 = time.time()
     content = content_formatter(user_input)
+    t1 = time.time()
+    timings['content_formatting'] = t1 - t0
+    _logger.info(f"Content formatted in {timings['content_formatting']:.2f} seconds")
     try:
         input_state = {
             "messages": [{"role": "user", "content": content}]
-        }
-        
-
+        } 
         turn_count = 0
         
+        t2 = time.time()
         for events in graph.stream(input_state, config=config):
             turn_count += 1
               
@@ -143,7 +149,10 @@ def stream_graph_updates(user_ph: str, user_input: dict) -> dict:
                 elif node_name == "tools":  # FIX: Correct indentation
                     _logger.info("Tools executed - ending conversation turn")
                     break
-    
+        t3 = time.time()
+        timings['ai_processing'] = t3 - t2
+        _logger.info(f"AI processed in {timings['ai_processing']:.2f} seconds")
+        _logger.info(f"Timings: {timings}")
     except Exception as e:
         _logger.error(f"Graph streaming error: {e}")
         final_response = {"content": "", "metadata": None}

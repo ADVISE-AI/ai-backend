@@ -13,6 +13,7 @@ _logger = logger(__name__)
 def handle_with_ai(clean_data: dict, conversation_id):
     """Process user message with AI and store both user and AI messages"""
     
+    start_time = time.time()
     user_input = user_input_builder(clean_data)
     ai_response = stream_graph_updates(clean_data["from"]["phone"], user_input)
 
@@ -38,6 +39,12 @@ def handle_with_ai(clean_data: dict, conversation_id):
 
         try:
             conn.execute(insert(message).values(row))
+
+            total_time = time.time() - start_time
+            _logger.info(f"⏱️ Processed user input in {total_time:.2f} seconds")
+
+            if total_time > 10:
+                _logger.warning(f"🐌 Slow processing: {total_time:.2f}s for {clean_data['from']['phone']}")
         except Exception as e:
             _logger.error(f"Failed to insert in DataBase: {e}")
 

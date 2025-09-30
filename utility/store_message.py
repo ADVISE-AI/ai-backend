@@ -27,6 +27,7 @@ def store_user_message(clean_data: dict, conversation_id: int):
                 }) if clean_data['from'].get('media_id') or clean_data['from'].get('mime_type') else None,
 
             "provider_ts": datetime.fromtimestamp(int(time.time())),
+            "extra_metadata": json.dumps({"context": clean_data.get("context")}) if clean_data.get("context") else None
         }
 
         try:

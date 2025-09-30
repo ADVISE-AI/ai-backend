@@ -114,6 +114,16 @@ def operatormsg():
     """Handle operator messages with full context sync"""
     if request.method == "POST":
         data = request.get_json()
+
+        if not data:
+            return jsonify({"status": "error", "message": "No data provided"}), 400
+    
+        required = ["receiverPhone", "message", "senderId"]
+        missing = [f for f in required if f not in data]
+        
+        if missing:
+            return jsonify({"status": "error", "message": f"Missing: {', '.join(missing)}"}), 400
+        
         phone = data["receiverPhone"]
         message = data["message"]
         sender_id = data["senderId"]

@@ -11,6 +11,8 @@ _logger = logger(__name__)
 def handback_to_ai():
     """Hand conversation back to AI"""
     data = request.get_json()
+    if not data or "phone" not in data:
+        return jsonify({"status": "error", "message": "Missing phone"}), 400
     phone = data["phone"]
     
     try:

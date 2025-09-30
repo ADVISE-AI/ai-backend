@@ -4,6 +4,16 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+required_vars = [
+    "APP_SECRET_KEY", "GEMINI_API_KEY", "WHATSAPP_ACCESS_TOKEN",
+    "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_GRAPH_URL",
+    "BACKEND_BASE_URL", "AI_BACKEND_URL", "VERIFY_TOKEN", "DB_URL"
+]
+
+missing = [var for var in required_vars if not os.getenv(var)]
+if missing:
+    raise EnvironmentError(f"Missing required env vars: {', '.join(missing)}")
+
 OPENAI_API_KEY=os.getenv("OPENAI_API_KEY")
 GOOGLE_API_KEY=os.getenv("GEMINI_API_KEY")
 WHATSAPP_ACCESS_TOKEN=os.getenv("WHATSAPP_ACCESS_TOKEN")

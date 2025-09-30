@@ -2,7 +2,7 @@ from config import logger
 
 _logger = logger(__name__)
 
-def refactor_dict(data: dict) -> dict: 
+def normalize_webhook_payload(data: dict) -> dict: 
     if "entry" not in data: return {"Error": "data not valid"}
     
     value = data["entry"][0]["changes"][0]["value"]

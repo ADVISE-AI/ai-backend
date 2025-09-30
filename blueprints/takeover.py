@@ -11,8 +11,12 @@ _logger = logger(__name__)
 def takeover_by_human():
     """Takeover conversation by human agent"""
     data = request.get_json()
-    phone = data["phone"]
     
+    if not data or "phone" not in data:
+        return jsonify({"status": "error", "message": "Missing phone"}), 400
+
+    phone = data["phone"]
+
     try:
         with engine.begin() as conn:
             # Set intervention flag
