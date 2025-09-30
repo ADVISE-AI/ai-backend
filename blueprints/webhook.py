@@ -1,10 +1,12 @@
 from flask import Blueprint, request
 from config import logger, VERIFY_TOKEN
-from utility import normalize_webhook_payload, is_duplicate_message, message_router
+from utility import normalize_webhook_payload, is_duplicate_message, message_router, get_message_buffer
 import json
 
 webhook_bp = Blueprint('webhook', __name__)
 _logger = logger(__name__)
+
+message_buffer = get_message_buffer(callback=message_router)
 
 @webhook_bp.route('/webhook', methods=['GET', 'POST'])
 def webhook():
@@ -19,7 +21,8 @@ def webhook():
             if is_duplicate_message(normalized_data["from"]["message_id"], normalized_data["from"]["phone"]):
                    _logger.info(f"Duplicate message {normalized_data['from']['message_id']} ignored")
                    return "OK", 200
-
+            
+            message_buffer.add_message(normalized_data["from"]["phone"], normalized_data)
             message_router(normalized_data)
 
         elif normalized_data["type"] == "status":

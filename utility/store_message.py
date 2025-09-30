@@ -59,6 +59,7 @@ def store_operator_message(message_text: str, user_ph: str, external_msg_id: str
             "conversation_id": conversation_id,
             "direction": "outbound",
             "sender_type": "operator",
+            "sender_id": kwargs.get("sender_id"),
             "external_id": external_msg_id,
             "has_text": True,
             "media_info": json.dumps({

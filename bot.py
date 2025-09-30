@@ -141,6 +141,7 @@ def stream_graph_updates(user_ph: str, user_input: dict) -> dict:
                     
                 if node_name == "gemini" and "messages" in value and value["messages"]:
                     last_message = value["messages"][-1]
+                    _logger.info(f"Gemini response received: {last_message}")
                     if hasattr(last_message, "content") and last_message.content:
                         final_response["content"] = last_message.content
                     if hasattr(last_message, "usage_metadata"):

@@ -6,6 +6,7 @@ from typing import Tuple, Optional, Dict
 import tempfile
 import requests
 import os
+import json
 
 operator_bp = Blueprint('operatormsg', __name__)
 _logger = logger(__name__)
@@ -109,11 +110,19 @@ def download_operator_media(file_id: str, mime_type: str) -> Optional[Dict]:
         return {"success": False, "error": str(e)}
     
    
-@operator_bp.route("/operatormsg", methods=["POST"])
+@operator_bp.route("/operatormsg", methods=["GET","POST"])
 def operatormsg():
     """Handle operator messages with full context sync"""
     if request.method == "POST":
-        data = request.get_json()
+        data = request.get_json(force=True)
+        
+        _logger.info(f"DATA RECEIVED: {json.dumps(data, indent=2)}")
+        # print(f"DATA RECEIVED: {data}, {type(data)}")
+        # if data:
+        #     return "OK", 200
+        # else:
+        #     return "FAILED", 500
+
 
         if not data:
             return jsonify({"status": "error", "message": "No data provided"}), 400
@@ -149,7 +158,7 @@ def operatormsg():
                     message_id = response.get("messages", [{}])[0].get('id') if response else None
 
                     # Store and sync to graph
-                    store_operator_message(message, phone, message_id, media_id=media_id, mime_type=mime_type)
+                    store_operator_message(message, phone, message_id, media_id=media_id, mime_type=mime_type, sender_id = sender_id)
                     return jsonify({"status": "success", "message_id": message_id})
 
                 except Exception as e:
