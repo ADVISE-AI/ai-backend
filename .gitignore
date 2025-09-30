@@ -1,7 +1,14 @@
 .venv/
 .env
 dataset/
+
 __pycache__/
+agent_tools/__pycache__/
+blueprints/__pycache__/
+utility/__pycache__/
+utility/whatsapp/__pycache__/
+
+data/
 finetuning/
 media/
 db_mgmt.py

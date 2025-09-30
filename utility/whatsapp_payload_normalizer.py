@@ -1,12 +1,6 @@
-import os
-from glob import glob
-from config import DB_URL, logger
-from whatsapp import upload_video
-from db import sample_library, engine
-from sqlalchemy import select, and_
+from config import logger
 
 _logger = logger(__name__)
-
 
 def refactor_dict(data: dict) -> dict: 
     if "entry" not in data: return {"Error": "data not valid"}
@@ -62,6 +56,7 @@ def refactor_dict(data: dict) -> dict:
                 "message_id": msg_id,
                 "mime_type": mime_type,
                 "media_id": media_id,
+                "message": media["caption"] if "caption" in media else None
                 },
             "context": context
             }
@@ -91,16 +86,3 @@ def refactor_dict(data: dict) -> dict:
         }
 
     return {"Error": "unhandled payload", "raw": value}
-
-
-def search_db_tool(media_file_type) -> list:
-    id_list = []
-    with engine.begin() as conn:
-        result = conn.execute(select(sample_library.c.media_id).where(sample_library.c.media_file_type == media_file_type))
-        media_id = result.fetchall()
-
-    for row in media_id:
-        id_list.append(row[0])
-    
-    return id_list;
-
