@@ -90,6 +90,7 @@ prompt_toolkit==3.0.52
 proto-plus==1.26.1
 protobuf==6.31.1
 psycopg==3.2.9
+psycopg-binary==3.2.10
 psycopg-pool==3.2.6
 psycopg2-binary==2.9.10
 ptyprocess==0.7.0

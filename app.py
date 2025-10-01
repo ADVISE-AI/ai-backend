@@ -26,11 +26,13 @@ from blueprints.webhook import webhook_bp
 from blueprints.operatormsg import operator_bp
 from blueprints.handback import handback_bp
 from blueprints.takeover import takeover_bp
+from blueprints.fetch_media import fetch_media_bp
 
 app.register_blueprint(webhook_bp)
 app.register_blueprint(operator_bp)
 app.register_blueprint(handback_bp)
 app.register_blueprint(takeover_bp)
+app.register_blueprint(fetch_media_bp)
 
 @app.route("/", methods=["GET"])
 def index():
