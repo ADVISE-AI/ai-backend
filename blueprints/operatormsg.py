@@ -178,13 +178,13 @@ def operatormsg():
             # Handle text message    
             try:
                 # Send to WhatsApp
-                with engine.begin() as conn:
-                    result = conn.execute(select(conversation.c.last_message_id).where(conversation.c.phone == str(phone)))
-                    last_msg_id = result.scalar_one_or_none()
-                    if last_msg_id:
-                        wa_msg_id = conn.execute(select(message.c.external_id).where(message.c.id == last_msg_id)).scalar_one_or_none()
-                        if wa_msg_id:
-                            typing_indicator(wa_msg_id)
+                # with engine.begin() as conn:
+                #     result = conn.execute(select(conversation.c.last_message_id).where(conversation.c.phone == str(phone)))
+                #     last_msg_id = result.scalar_one_or_none()
+                #     if last_msg_id:
+                #         wa_msg_id = conn.execute(select(message.c.external_id).where(message.c.id == last_msg_id)).scalar_one_or_none()
+                #         if wa_msg_id:
+                #             typing_indicator(wa_msg_id)
 
                 response = send_message(phone, message)
                 message_id = response.get("messages", [{}])[0].get('id') if response else None
