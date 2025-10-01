@@ -189,14 +189,13 @@ def send_media(media_type: str, user_ph: str, media_id: str, caption: str = "") 
     }
 
     try:
-        _logger.info(f"DATA BEFORE SENDING! URL:{url}, HEADERS: {get_headers()}, DATA:{data}")
+        # _logger.info(f"DATA BEFORE SENDING! URL:{url}, HEADERS: {get_headers()}, DATA:{data}")
         response = requests.post(url, headers=get_headers(), json=data)
         _logger.info("Media send response for %s: %s", media_id, response.status_code)
-        _logger.info(f"RESPONSE: {response.json()}")
         
         if response.ok:
             _logger.info("Media %s sent successfully to %s", media_id, user_ph)
-            _logger.debug("Response JSON: %s", response.json())
+            # _logger.debug("Response JSON: %s", response.json())
             return response.json()
         else:
             _logger.error("Failed to send media %s. Status: %s", media_id, response.status_code)

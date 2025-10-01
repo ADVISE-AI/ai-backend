@@ -8,32 +8,43 @@ import time
 
 _logger = logger(__name__)
 
-def store_user_message(clean_data: dict, conversation_id: int):
-    """Store user message without AI processing"""
+def store_user_message(clean_data: dict, conversation_id: int, conn=None):
+    """Store user message without AI processing
     
-    with engine.begin() as conn:
-        row = {
-            "conversation_id": conversation_id,
-            "direction": "inbound",
-            "sender_type": "customer", 
-            "external_id": str(clean_data['from'].get('message_id')),
-            "has_text": True if clean_data['from'].get('message') else False,
-            "message_text": clean_data['from'].get('message') if isinstance(clean_data['from'].get('message'), str) else None,
+    Args:
+        clean_data: Normalized message data
+        conversation_id: ID of the conversation
+        conn: Optional database connection (for reusing transaction)
+    """
+    
+    row = {
+        "conversation_id": conversation_id,
+        "direction": "inbound",
+        "sender_type": "customer", 
+        "external_id": str(clean_data['from'].get('message_id')),
+        "has_text": True if clean_data['from'].get('message') else False,
+        "message_text": clean_data['from'].get('message') if isinstance(clean_data['from'].get('message'), str) else None,
 
-            "media_info": json.dumps({
-                    "id": clean_data['from'].get('media_id'),
-                    "mime_type": clean_data['from'].get('mime_type'),
-                    "description": ""
-                }) if clean_data['from'].get('media_id') or clean_data['from'].get('mime_type') else None,
+        "media_info": json.dumps({
+                "id": clean_data['from'].get('media_id'),
+                "mime_type": clean_data['from'].get('mime_type'),
+                "description": ""
+            }) if clean_data['from'].get('media_id') or clean_data['from'].get('mime_type') else None,
 
-            "provider_ts": datetime.fromtimestamp(int(time.time())),
-            "extra_metadata": json.dumps({"context": clean_data.get("context")}) if clean_data.get("context") else None
-        }
+        "provider_ts": datetime.fromtimestamp(int(time.time())),
+        "extra_metadata": json.dumps({"context": clean_data.get("context")}) if clean_data.get("context") else None
+    }
 
-        try:
+    try:
+        if conn:
+            # Reuse existing connection/transaction
             conn.execute(insert(message).values(row))
-        except Exception as e:
-            _logger.error(f"Failed to insert into DataBase: {e}")
+        else:
+            # Create new transaction
+            with engine.begin() as conn:
+                conn.execute(insert(message).values(row))
+    except Exception as e:
+        _logger.error(f"Failed to insert into DataBase: {e}")
 
 def store_operator_message(message_text: str, user_ph: str, external_msg_id: str = None, **kwargs):
     """Store operator message and sync to LangGraph

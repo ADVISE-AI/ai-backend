@@ -154,7 +154,8 @@ def operatormsg():
                         raise Exception("Media upload failed, no media ID returned")
                     
                     # Send media message
-                    response = send_media(media_type, phone, media_id)
+                    response = send_media(media_type, phone, media_id, message)
+
                     message_id = response.get("messages", [{}])[0].get('id') if response else None
 
                     # Store and sync to graph
