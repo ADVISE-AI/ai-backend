@@ -177,7 +177,7 @@ def operatormsg():
         else:
             # Handle text message    
             try:
-                # Send to WhatsApp
+                # # Send to WhatsApp
                 # with engine.begin() as conn:
                 #     result = conn.execute(select(conversation.c.last_message_id).where(conversation.c.phone == str(phone)))
                 #     last_msg_id = result.scalar_one_or_none()
