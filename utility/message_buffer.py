@@ -4,7 +4,7 @@ from collections import defaultdict
 from config import logger
 from typing import Dict, List, Callable
 
-_logger = logger.get_logger(__name__)
+_logger = logger(__name__)
 
 class Message_Buffer:
     """ 
@@ -168,11 +168,11 @@ class Message_Buffer:
 
 def get_message_buffer(callback: Callable) -> Message_Buffer:
     """Get or create the global message buffer"""
-    global _message_buffer
-    if _message_buffer is None:
-        _message_buffer = Message_Buffer(
+    global Message_Buffer
+    if Message_Buffer is None:
+        Message_Buffer = Message_Buffer(
             debounce_seconds=3.0,  # Wait 3s after last message
             max_wait_seconds=10.0,  # But process after 10s max
             callback=callback
         )
-    return _message_buffer
+    return Message_Buffer
