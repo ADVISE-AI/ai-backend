@@ -14,35 +14,35 @@ def takeover_by_human():
         data = request.get_json(force=True)
         
         _logger.info(f"DATA RECEIVED: {json.dumps(data, indent = 2)}")
-        # print(f"DATA RECEIVED: {data}, {type(data)}")
 
-        if data:
-            return "OK", 200
-        else:
-            return "FAILED", 500
-        # if not data or "phone" not in data:
-        #     return jsonify({"status": "error", "message": "Missing phone"}), 400
 
-        # phone = data["phone"]
+        if not data or "phone" not in data:
+            return jsonify({"status": "error", "message": "Missing phone"}), 400
 
-        # try:
-        #     with engine.begin() as conn:
-        #         # Set intervention flag
-        #         conn.execute(
-        #             update(conversation)
-        #             .where(conversation.c.phone == str(phone))
-        #             .values({"human_intervention_required": True})
-        #         )
+        phone = data["phone"]
+
+        try:
+            _logger.info(f"Setting intervention flag for {phone}")
+            with engine.begin() as conn:
+                # Set intervention flag
+                conn.execute(
+                    update(conversation)
+                    .where(conversation.c.phone == str(phone))
+                    .values({"human_intervention_required": True})
+                )
+                _logger.info(f"Intervention flag set for {phone}")
                 
-        #         # Update LangGraph state
-        #         config = {"configurable": {"thread_id": phone}}
-        #         graph.update_state(config, {"operator_active": True})
+                # Update LangGraph state
+                _logger.info(f"Updating LangGraph state for {phone}")
+                config = {"configurable": {"thread_id": phone}}
+                graph.update_state(config, {"operator_active": True})
+                _logger.info(f"LangGraph state updated for {phone}")
                 
-        #     return jsonify({"status": "takeover_complete"})
+            return jsonify({"status": "takeover_complete"}), 200
             
-        # except Exception as e:
-        #     _logger.error(f"Takeover failed: {e}")
-        #     return jsonify({"status": "error"}), 500
+        except Exception as e:
+            _logger.error(f"Takeover failed: {e}")
+            return jsonify({"status": "error"}), 500
         
     elif request.method == "GET":
-        return "THIS ENDPOINT IS UP AND WORKS"
+        return "THIS ENDPOINT IS UP AND WORKS", 200

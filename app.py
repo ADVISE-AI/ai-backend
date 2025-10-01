@@ -58,5 +58,5 @@ def handle_404(e):
 
 @app.errorhandler(Exception)
 def handle_exception(e):
-    _logger("app").error(f"Unhandled exception: {e}")
+    _logger.error(f"Unhandled exception: {e}")
     return "Something went wrong", 500

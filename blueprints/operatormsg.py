@@ -123,7 +123,7 @@ def operatormsg():
         # else:
         #     return "FAILED", 500
 
-
+        
         if not data:
             return jsonify({"status": "error", "message": "No data provided"}), 400
     
@@ -181,7 +181,7 @@ def operatormsg():
                 # Store and sync to graph
                 store_operator_message(message, phone, message_id)
 
-                return jsonify({"status": "success", "message_id": message_id})
+                return jsonify({"status": "success", "message_id": message_id}), 200
 
             except Exception as e:
                 _logger.error(f"Failed to send operator message: {e}")

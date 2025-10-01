@@ -2,11 +2,12 @@ from typing import Annotated, List
 from typing_extensions import TypedDict
 from langgraph.graph import StateGraph, START, END 
 from langgraph.graph.message import AnyMessage, add_messages
+from langchain_core.messages import ToolMessage
 from langchain.chat_models import init_chat_model
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnableConfig
 from langgraph.prebuilt import ToolNode, InjectedState
-from langchain_core.tools import tool
+from langchain_core.tools import tool, InjectedToolCallId
 from langgraph.types import Command
 from langgraph.checkpoint.postgres import PostgresSaver
 from config import GOOGLE_API_KEY, DB_URL, logger
@@ -51,15 +52,16 @@ def RespondWithMedia(media_description: str, * ,config: RunnableConfig) -> dict:
 
 @tool("RequestIntervention")
 def RequestIntervention(
-    status: bool = True, *, config: RunnableConfig, state: Annotated[dict, InjectedState]
+    status: bool = True, *, config: RunnableConfig, state: Annotated[dict, InjectedState], tool_call_id: Annotated[str, InjectedToolCallId]
 ) -> Command:
     """
     Tool for Gemini to request manual takeover when it cannot handle a user query.
     """
     user_ph = config.get("configurable", {}).get("thread_id")
     callIntervention(state, user_ph)
-    
-    return Command(update={"operator_active": True})
+
+
+    return Command(update={"operator_active": True, "messages": [ToolMessage("Success", tool_call_id=tool_call_id)]})
 
 
 prompt_template = ChatPromptTemplate.from_messages([

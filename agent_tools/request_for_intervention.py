@@ -26,7 +26,8 @@ def callIntervention(state, user_ph: str):
                 response = requests.post(
                     f"{AI_BACKEND_URL}/takeover", json={"phone": user_ph}
                 )
-
+                response = response.json()
+                
                 if response["status"] == "takeover_complete":
                     _logger.info(f"Intervention requested for {user_ph}")
                     return response
