@@ -41,7 +41,13 @@ def RespondWithMedia(media_description: str, * ,config: RunnableConfig) -> dict:
     """
     Send the user WhatsApp media based on file type.
     Args:
-         media_description: Choose one of 'ai', '3d', '2d', 'info', 'customer_review', 'intro'.
+         media_description: Choose one of 'ai', '3d', '2d', 'info', 'customer_review', 'intro', 'bride_groom_sample'.
+    Extra notes for the LLM:
+        ai, 3d, 2d are videos
+        File 'intro' is an image which contains introduction about Joy Invite and why it is better than other businesses
+        File 'info' is an audio which contains information about the procedure to be followed by the user to order a digital invite
+        File 'customer_review' is an image which contains a screenshot of a chat from a previous customer who is thanking us genuinely for our service
+        File 'bride_groom_sample' is an image which contains an example picture of bride and groom. 
     """
     user_ph = config.get("configurable", {}).get("thread_id")
 

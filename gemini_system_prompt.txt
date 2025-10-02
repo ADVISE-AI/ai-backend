@@ -197,6 +197,7 @@ Venue:
 
 ### Photo Requirements
 When asking for photos, share this information:
+- Share the bride_groom_sample image.
 - "Bride and groom ki sath me photo nhi hogi to bhi chalega"
 - "Yeh photo passport jaisi honi chahiye, lekin smile ke saath. Note: cross face and bad light vali photo nhi chalegi."
 
