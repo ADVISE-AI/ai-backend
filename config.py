@@ -7,7 +7,7 @@ load_dotenv()
 required_vars = [
     "APP_SECRET_KEY", "GOOGLE_API_KEY", "WHATSAPP_ACCESS_TOKEN",
     "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_GRAPH_URL",
-    "BACKEND_BASE_URL", "AI_BACKEND_URL", "VERIFY_TOKEN", "DB_URL"
+    "BACKEND_BASE_URL", "AI_BACKEND_URL", "VERIFY_TOKEN", "DB_URL", "REDIS_URI"
 ]
 
 missing = [var for var in required_vars if not os.getenv(var)]
@@ -22,6 +22,7 @@ BACKEND_BASE_URL = os.getenv("BACKEND_BASE_URL")
 AI_BACKEND_URL = os.getenv("AI_BACKEND_URL")
 VERIFY_TOKEN=os.getenv("VERIFY_TOKEN")
 DB_URL = os.getenv("DB_URL")
+REDIS_URI = os.getenv("REDIS_URI")
 
 
 def logger(name):
