@@ -50,20 +50,22 @@ def webhook():
             status_msg_id = normalized_data.get('id', 'unknown')
             status = normalized_data.get('status', 'unknown')
                 
-            _logger.info(f"Message Status update {status_msg_id} -> {status}")
                 
             try:
+                _logger.info(f"Message Status update {status_msg_id} ➔ {status}")
+
+                start_time = time.time()
                 update_message_status_task.apply_async(
                 args=[normalized_data],
                 queue='status',
                 priority=2
                 )
 
+                response_time = (time.time() - start_time) * 1000
+                _logger.info(f"✅ WEBHOOK: Status acknowledged in {response_time:.0f}ms")
             except Exception as e:
                 _logger.error(f"Failed to queue status update: {e}")
             
-            response_time = (time.time() - start_time) * 1000
-            _logger.info(f"✅ WEBHOOK: Status acknowledged in {response_time:.0f}ms")
             return "OK", 200
         
         else:

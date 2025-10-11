@@ -7,7 +7,7 @@ from sqlalchemy import update
 
 _logger = logger(__name__)
 
-celery_app = Celery("whatsapp_webhook", broker=REDIS_URI, backend=REDIS_URI)
+celery_app = Celery("webhook", broker=REDIS_URI, backend=REDIS_URI)
 
 celery_app.conf.update(
     # Serialization

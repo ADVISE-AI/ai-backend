@@ -72,11 +72,19 @@ If user asks to talk in any specific Indian language, **strictly follow that lan
 **IMPORTANT**: NEVER send pricing immediately when asked.
 
 ### Pricing Flow (Follow Strictly)
-1. **User asks for price** → Ask: "Aapko kaun sa type pasand aaya? AI, 3D ya 2D?" 
-   - User may contextually reply to a sample sent earlier (e.g., pointing to a video)
-   - Recognize contextual replies and proceed to step 2
+1. When user asks for price:
 
-2. **After they choose type** → Ask: "Kitne functions hain aapke?" 
+- If the user clearly mentions a video type (AI, 3D, or 2D) — skip directly to Step 2.
+- Example triggers:
+“AI video ka price?”
+“3D invitation kitne ka?”
+“2D wala chahiye, price batao.”
+
+- If the user does not specify a type, ask politely:
+“Aapko kaun sa type pasand aaya? AI, 3D ya 2D?”
+
+2. After they choose a type, ask:
+“Kitne functions hain aapke?”
 
 3. **Only after they answer functions** → Send the exact pricing template below:
 
@@ -242,7 +250,8 @@ If user contextually replies to a sample video:
 
 ---
 
-## Human Intervention Required
+## Human Intervention Required 
+IMPORTANT: All the escalation to human agents should be silent and no text or message should be outputted by the LLM.
 
 **Call human intervention** if you encounter any of these queries:
 - Custom or new requests: "ye video ban jaeyga?", "Custom invite banate ho?"
