@@ -1,14 +1,14 @@
 from flask import Blueprint, request
 from config import logger, VERIFY_TOKEN
-from utility import normalize_webhook_payload, is_duplicate, message_router, get_message_buffer
-from tasks import process_message_task, update_message_status_task
+from utility import normalize_webhook_payload, is_duplicate, get_message_buffer
+from tasks import process_message_task, update_message_status_task, check_buffer_task
 import time
 import json
 
 webhook_bp = Blueprint('webhook', __name__)
 _logger = logger(__name__)
 
-message_buffer = get_message_buffer(callback=message_router)
+message_buffer = get_message_buffer()
 
 @webhook_bp.route('/webhook', methods=['GET', 'POST'])
 def webhook():
@@ -24,45 +24,33 @@ def webhook():
                    _logger.info(f"Duplicate message {normalized_data['from']['message_id']} ignored")
                    return "OK", 200
             
-            message_buffer.add_message(normalized_data["from"]["phone"], normalized_data)
+            is_first_message = message_buffer.add_message(normalized_data["from"]["phone"], normalized_data)
 
-            try:
-                _logger.info(f"Queueing message {normalized_data}")
-                start_time = time.time()
-                task = process_message_task.apply_async(args=[normalized_data], queue='messages', priority = 5, retry = True, retry_policy = { 
-                    'max_retries': 3, 
-                    'interval_start': 5,
-                    'interval_step': 10,
-                    'interval_max': 60,
-                })
-
-                response_time = (time.time() - start_time) * 1000
-                _logger.info(f"Task {task.id} queued for message {task.id[:8]} in {response_time:.2f} ms")
-
-            except Exception as e:
-                _logger.error(f"Failed to queue task for message {normalized_data['from']['message_id']}: {e}", exc_info=True)
+            if is_first_message:
+                # Schedule buffer check after debounce time
+                _logger.info(f"Scheduling buffer check for {normalized_data['from']['phone']} in 3 seconds")
+                check_buffer_task.apply_async(
+                    args=[normalized_data['from']['phone']],
+                    countdown=10,  # Check after 3 seconds
+                    queue='messages',
+                    priority=5
+                )
             
             return "OK", 200
-            
 
         elif normalized_data["type"] == "status":
             _logger.info(f"Message status update received: {json.dumps(normalized_data, indent=2)}")
             status_msg_id = normalized_data.get('id', 'unknown')
             status = normalized_data.get('status', 'unknown')
-                
-                
+                           
             try:
                 _logger.info(f"Message Status update {status_msg_id} ➔ {status}")
 
                 start_time = time.time()
-                update_message_status_task.apply_async(
-                args=[normalized_data],
-                queue='status',
-                priority=2
-                )
+                update_message_status_task.apply_async(args=[normalized_data], queue='status', priority=2)
 
                 response_time = (time.time() - start_time) * 1000
-                _logger.info(f"✅ WEBHOOK: Status acknowledged in {response_time:.0f}ms")
+                _logger.info(f"WEBHOOK: Status acknowledged in {response_time:.0f}ms")
             except Exception as e:
                 _logger.error(f"Failed to queue status update: {e}")
             

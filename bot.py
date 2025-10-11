@@ -16,15 +16,23 @@ from agent_tools.media_response_tool import send_media_tool
 from agent_tools.request_for_intervention import callIntervention
 from utility.content_block import content_formatter
 
-from psycopg import Connection
+from psycopg_pool import ConnectionPool
 
 _logger = logger(__name__)
 
 
-langgraph_conn = Connection.connect(f"postgresql://{DB_URL}", autocommit = True)
+_connection_pool = ConnectionPool(
+    conninfo=f"postgresql://{DB_URL}",
+    min_size=5,
+    max_size=20,
+    kwargs={
+        "autocommit": True,
+        "prepare_threshold": 0,  # Disable prepared statements
+    }
+)
 
 try:
-    checkpointer = PostgresSaver(langgraph_conn)
+    checkpointer = PostgresSaver(_connection_pool)
     checkpointer.setup()
     _logger.info("Langgraph DB setup successfully")
 except Exception as e:

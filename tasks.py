@@ -2,6 +2,7 @@ from celery import Celery
 from celery.signals import task_failure, task_success
 from config import logger, REDIS_URI
 from utility import message_router
+from utility.message_buffer import get_message_buffer
 from db import engine, message as message_table
 from sqlalchemy import update
 
@@ -39,6 +40,125 @@ celery_app.conf.update(
     worker_send_task_events=True,
     task_send_sent_event=True,
 )
+
+@celery_app.task(name='tasks.check_buffer')
+def check_buffer_task(phone: str):
+    """
+    Check if buffer should be processed for a user
+    
+    This task is scheduled after debounce_time. If user is still typing,
+    it reschedules itself. Otherwise, it processes the buffer.
+    """
+    redis_buffer = get_message_buffer()
+    
+    _logger.info(f"Checking buffer for {phone}")
+    
+    # Check if enough time has passed
+    if redis_buffer.should_process(phone):
+        # Get all messages
+        messages = redis_buffer.get_messages(phone)
+        
+        if messages:
+            _logger.info(f"Processing {len(messages)} buffered messages for {phone}")
+            
+            # Combine messages
+            combined_message = _combine_messages(messages)
+            
+            # Queue for processing
+            process_message_task.apply_async(
+                args=[combined_message],
+                queue='messages',
+                priority=5
+            )
+        else:
+            _logger.warning(f"No messages in buffer for {phone}")
+    else:
+        # User still typing, check again in 1 second
+        buffer_size = redis_buffer.get_buffer_size(phone)
+        _logger.info(f"User {phone} still typing. Buffer size: {buffer_size}. Checking again in 1s")
+        
+        check_buffer_task.apply_async(
+            args=[phone],
+            countdown=1,
+            queue='messages',
+            priority=5
+        )
+
+
+def _combine_messages(messages: list) -> dict:
+    """
+    Combine multiple messages into a single normalized message
+    
+    Logic:
+    - If all text: combine with newlines
+    - If has media: use last media, combine all text as caption
+    - Keep metadata from first message
+    """
+    if len(messages) == 1:
+        return messages[0]
+    
+    first_msg = messages[0]
+    last_msg = messages[-1]
+    
+    # Separate text and media messages
+    text_messages = [m for m in messages if m.get('class') == 'text']
+    media_messages = [m for m in messages if m.get('class') == 'media']
+    
+    # All text messages
+    if text_messages and not media_messages:
+        combined_text = "\n".join([
+            m['from']['message'] 
+            for m in text_messages 
+            if m['from'].get('message')
+        ])
+        
+        return {
+            'class': 'text',
+            'category': None,
+            'type': first_msg['type'],
+            'timestamp': last_msg['timestamp'],
+            'from': {
+                'phone': first_msg['from']['phone'],
+                'name': first_msg['from']['name'],
+                'message_id': last_msg['from']['message_id'],
+                'message': combined_text,
+            },
+            'context': last_msg.get('context')
+        }
+    
+    # Has media messages
+    elif media_messages:
+        last_media = media_messages[-1]
+        
+        # Combine all text (from text messages and media captions)
+        all_text = []
+        for m in text_messages:
+            if m['from'].get('message'):
+                all_text.append(m['from']['message'])
+        for m in media_messages:
+            if m['from'].get('message'):
+                all_text.append(m['from']['message'])
+        
+        combined_caption = '\n'.join(all_text) if all_text else None
+        
+        return {
+            'class': 'media',
+            'category': last_media['category'],
+            'type': last_media['type'],
+            'timestamp': last_media['timestamp'],
+            'from': {
+                'phone': last_media['from']['phone'],
+                'name': last_media['from']['name'],
+                'message_id': last_media['from']['message_id'],
+                'mime_type': last_media['from']['mime_type'],
+                'media_id': last_media['from']['media_id'],
+                'message': combined_caption
+            },
+            'context': last_media.get('context')
+        }
+    
+    # Fallback
+    return last_msg
 
 
 @celery_app.task(
@@ -123,6 +243,9 @@ def update_message_status_task(status_data: dict):
     except Exception as e:
         _logger.error(f"Status update failed: {e}", exc_info=True)
         return {"status": "failed", "error": str(e)}
+
+
+
 
 
 # Task routing to different queues
