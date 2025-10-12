@@ -54,19 +54,19 @@ preload_app = True  # Saves memory, but harder to reload
 # Hook for worker initialization
 def on_starting(server):
     """Called just before the master process is initialized."""
-    print("🚀 Gunicorn master starting")
+    print("Gunicorn master starting")
 
 def when_ready(server):
     """Called just after the server is started."""
-    print(f"✅ Gunicorn ready with {workers} workers")
+    print(f"Gunicorn ready with {workers} workers")
 
 def on_reload(server):
     """Called to recycle workers during a reload via SIGHUP."""
-    print("🔄 Gunicorn reloading")
+    print("Gunicorn reloading")
 
 def worker_int(worker):
     """Called when a worker receives the SIGINT or SIGQUIT signal."""
-    print(f"⚠️  Worker {worker.pid} interrupted")
+    print(f"️Worker {worker.pid} interrupted")
 
 def pre_fork(server, worker):
     """Called just before a worker is forked."""
@@ -74,12 +74,12 @@ def pre_fork(server, worker):
 
 def post_fork(server, worker):
     """Called just after a worker has been forked."""
-    print(f"👷 Worker {worker.pid} spawned")
+    print(f"Worker {worker.pid} spawned")
 
 def post_worker_init(worker):
     """Called just after a worker has initialized the application."""
-    print(f"✅ Worker {worker.pid} initialized")
+    print(f"Worker {worker.pid} initialized")
 
 def worker_exit(server, worker):
     """Called just after a worker has been exited."""
-    print(f"👋 Worker {worker.pid} exited")
+    print(f"Worker {worker.pid} exited")
