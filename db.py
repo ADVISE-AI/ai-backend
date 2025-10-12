@@ -1,13 +1,18 @@
 import sqlalchemy
 from sqlalchemy import create_engine, Table, MetaData, insert, update, delete
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import QueuePool
 from config import DB_URL, logger
 
 _logger =  logger(__name__)
 try:
     engine = create_engine(
         f"postgresql+psycopg2://{DB_URL}", 
-        poolclass=NullPool,  # No connection pooling - creates fresh connection each time
+        poolclass=QueuePool,
+        pool_size=5,          # Min connections
+        max_overflow=10,      # Max additional connections
+        pool_timeout=30,      # Wait 30s for connection
+        pool_recycle=3600,    # Recycle connections after 1 hour
+        pool_pre_ping=True,   # Test connections before use (CRITICAL for SSL)
         connect_args={
             "sslmode": "require",
             "connect_timeout": 10,
