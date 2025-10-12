@@ -3,37 +3,31 @@ from config import logger, BACKEND_BASE_URL
 from utility import store_operator_message
 from utility.whatsapp import send_message, upload_media, send_media, typing_indicator
 from typing import Tuple, Optional, Dict
-from db import engine, conversation, message
+from db import engine, conversation, message, execute_with_retry
 from sqlalchemy import select
+from sqlalchemy.exc import OperationalError, DBAPIError
 import tempfile
 import requests
 import os
 import json
+import time
 
 operator_bp = Blueprint('operatormsg', __name__)
 _logger = logger(__name__)
 
 def get_media_type_and_extension(mime_type: str) -> Tuple[str, str]:
-
     mime_mapping = {
-        # Images
         "image/jpeg": ("image", ".jpg"),
         "image/jpg": ("image", ".jpg"),
         "image/png": ("image", ".png"),
         "image/webp": ("image", ".webp"),
-        
-        # Videos
         "video/mp4": ("video", ".mp4"),
         "video/3gpp": ("video", ".3gp"),
-        
-        # Audio
         "audio/aac": ("audio", ".aac"),
         "audio/mp4": ("audio", ".m4a"),
         "audio/mpeg": ("audio", ".mp3"),
         "audio/amr": ("audio", ".amr"),
         "audio/ogg": ("audio", ".ogg"),
-        
-        # Documents
         "application/pdf": ("document", ".pdf"),
         "application/vnd.ms-powerpoint": ("document", ".ppt"),
         "application/msword": ("document", ".doc"),
@@ -42,46 +36,34 @@ def get_media_type_and_extension(mime_type: str) -> Tuple[str, str]:
         "application/vnd.openxmlformats-officedocument.presentationml.presentation": ("document", ".pptx"),
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ("document", ".xlsx"),
     }
-    
     return mime_mapping.get(mime_type.lower(), ("document", ".bin"))
 
 
 def download_operator_media(file_id: str, mime_type: str) -> Optional[Dict]:
-
     download_url = f"{BACKEND_BASE_URL}api/v1/get-sent-media"
     
     try:
         _logger.info(f"Downloading media: fileId={file_id}, mimeType={mime_type}")
         
-        # Download the media file
         response = requests.get(
             download_url,
-            params={
-                "fileId": file_id,
-                "type": mime_type
-            },
+            params={"fileId": file_id, "type": mime_type},
             stream=True,
             timeout=30
         )
         
         if not response.ok:
             _logger.error(f"Failed to download media. Status: {response.status_code}")
-            return {
-                "success": False,
-                "error": f"Download failed with status {response.status_code}"
-            }
+            return {"success": False, "error": f"Download failed with status {response.status_code}"}
         
-        # Determine file extension and media type
         media_type, file_ext = get_media_type_and_extension(mime_type)
         
-        # Save to temporary file
         temp_file = tempfile.NamedTemporaryFile(
             delete=False, 
             suffix=file_ext,
             prefix=f"operator_media_{file_id}_"
         )
         
-        # Write content in chunks
         for chunk in response.iter_content(chunk_size=8192):
             if chunk:
                 temp_file.write(chunk)
@@ -110,7 +92,38 @@ def download_operator_media(file_id: str, mime_type: str) -> Optional[Dict]:
     except Exception as e:
         _logger.exception(f"Unexpected error downloading media {file_id}: {str(e)}")
         return {"success": False, "error": str(e)}
+
+
+def store_operator_message_with_retry(message_text: str, phone: str, message_id: str = None, **kwargs):
+    """
+    Store operator message with automatic retry on connection errors
     
+    This wraps the store function to handle transient DB issues
+    """
+    max_retries = 3
+    
+    for attempt in range(max_retries):
+        try:
+            store_operator_message(message_text, phone, message_id, **kwargs)
+            return  # Success!
+            
+        except (OperationalError, DBAPIError) as e:
+            error_msg = str(e).lower()
+            is_connection_error = any(
+                keyword in error_msg 
+                for keyword in ['ssl', 'connection', 'closed', 'broken', 'timeout', 'network']
+            )
+            
+            if is_connection_error and attempt < max_retries - 1:
+                backoff = 0.1 * (2 ** attempt)
+                _logger.warning(f"DB store failed (attempt {attempt + 1}/{max_retries}): {str(e)[:100]}")
+                _logger.info(f"Retrying in {backoff:.2f}s...")
+                time.sleep(backoff)
+                continue
+            
+            # Not a connection error or out of retries
+            _logger.error(f"Failed to store operator message after {attempt + 1} attempts")
+            raise
    
 @operator_bp.route("/operatormsg", methods=["GET","POST"])
 def operatormsg():
@@ -119,12 +132,6 @@ def operatormsg():
         data = request.get_json(force=True)
         
         _logger.info(f"DATA RECEIVED: {json.dumps(data, indent=2)}")
-        # print(f"DATA RECEIVED: {data}, {type(data)}")
-        # if data:
-        #     return "OK", 200
-        # else:
-        #     return "FAILED", 500
-
         
         if not data:
             return jsonify({"status": "error", "message": "No data provided"}), 400
@@ -157,11 +164,16 @@ def operatormsg():
                     
                     # Send media message
                     response = send_media(media_type, phone, media_id, message)
-
                     message_id = response.get("messages", [{}])[0].get('id') if response else None
 
-                    # Store and sync to graph
-                    store_operator_message(message, phone, message_id, media_id=media_id, mime_type=mime_type, sender_id = sender_id)
+                    # Store with retry logic
+                    store_operator_message_with_retry(
+                        message, phone, message_id, 
+                        media_id=media_id, 
+                        mime_type=mime_type, 
+                        sender_id=sender_id
+                    )
+                    
                     return jsonify({"status": "success", "message_id": message_id})
 
                 except Exception as e:
@@ -177,24 +189,15 @@ def operatormsg():
         else:
             # Handle text message    
             try:
-                # # Send to WhatsApp
-                # with engine.begin() as conn:
-                #     result = conn.execute(select(conversation.c.last_message_id).where(conversation.c.phone == str(phone)))
-                #     last_msg_id = result.scalar_one_or_none()
-                #     if last_msg_id:
-                #         wa_msg_id = conn.execute(select(message.c.external_id).where(message.c.id == last_msg_id)).scalar_one_or_none()
-                #         if wa_msg_id:
-                #             typing_indicator(wa_msg_id)
-
+                # Send to WhatsApp
                 response = send_message(phone, message)
                 message_id = response.get("messages", [{}])[0].get('id') if response else None
 
-                # Store and sync to graph
-                store_operator_message(message, phone, message_id)
+                # Store with retry logic - THIS IS THE KEY CHANGE
+                store_operator_message_with_retry(message, phone, message_id, sender_id=sender_id)
 
                 return jsonify({"status": "success", "message_id": message_id}), 200
 
             except Exception as e:
                 _logger.error(f"Failed to send operator message: {e}")
                 return jsonify({"status": "error", "error": str(e)}), 500
-        

@@ -39,8 +39,8 @@ def is_disconnect_error(e, connection, cursor):
         'decryption failed',
         'connection refused',
         'no route to host',
-        'terminating connection',  # RDS-specific
-        'the connection has been closed',  # RDS-specific
+        'terminating connection',
+        'the connection has been closed',
         'network error',
         'broken pipe'
     ]
@@ -53,6 +53,28 @@ def is_disconnect_error(e, connection, cursor):
     
     return False
 
+
+# FIXED: Proper event handler signature for handle_error
+@event.listens_for(Pool, "handle_error")
+def receive_error(exception_context):
+    """
+    Handle database errors and determine if connection should be invalidated
+    
+    Args:
+        exception_context: SQLAlchemy ExceptionContext object with attributes:
+            - original_exception: The exception that was raised
+            - sqlalchemy_exception: SQLAlchemy wrapper exception
+            - connection: The connection object (may be None)
+    """
+    if is_disconnect_error(
+        exception_context.original_exception,
+        exception_context.connection,
+        None  # cursor not available in this context
+    ):
+        _logger.warning("Connection error detected, invalidating connection")
+        exception_context.is_disconnect = True
+
+
 @event.listens_for(Pool, "connect")
 def receive_connect(dbapi_conn, connection_record):
     """Called when new connection is created"""
@@ -62,23 +84,24 @@ def receive_connect(dbapi_conn, connection_record):
     # Set AWS RDS-optimized connection parameters
     try:
         cursor = dbapi_conn.cursor()
-        # Prevent long-running queries
         cursor.execute("SET statement_timeout = '30s'")
-        # Kill idle transactions
         cursor.execute("SET idle_in_transaction_session_timeout = '60s'")
         cursor.close()
     except Exception as e:
         _logger.warning(f"Could not set connection parameters: {e}")
+
 
 @event.listens_for(Pool, "checkout")
 def receive_checkout(dbapi_conn, connection_record, connection_proxy):
     """Log when connection is taken from pool"""
     _logger.debug(f"↗Connection checked out")
 
+
 @event.listens_for(Pool, "checkin")
 def receive_checkin(dbapi_conn, connection_record):
     """Log when connection is returned to pool"""
     _logger.debug(f"↙Connection returned to pool")
+
 
 @event.listens_for(Pool, "close")
 def receive_close(dbapi_conn, connection_record):
@@ -86,9 +109,10 @@ def receive_close(dbapi_conn, connection_record):
     connection_stats["closed"] += 1
     _logger.info(f"Connection closed (total: {connection_stats['closed']})")
 
+
 @event.listens_for(Pool, "invalidate")
 def receive_invalidate(dbapi_conn, connection_record, exception):
-    """Called when connection is invalidated (dead connection detected)"""
+    """Called when connection is invalidated"""
     connection_stats["pre_ping_failures"] += 1
     connection_stats["reconnections"] += 1
     if exception:
@@ -96,57 +120,38 @@ def receive_invalidate(dbapi_conn, connection_record, exception):
     else:
         _logger.warning(f"Connection invalidated (#{connection_stats['pre_ping_failures']})")
 
+
 # Create engine with AWS RDS-specific optimizations
 try:
     engine = create_engine(
         f"postgresql+psycopg2://{DB_URL}",
         
-        # Pool configuration optimized for AWS RDS
         poolclass=QueuePool,
-        pool_size=3,              # Small pool for Flask app
-        max_overflow=7,           # Up to 10 total connections
-        pool_timeout=30,          # Wait 30s for connection
+        pool_size=3,
+        max_overflow=7,
+        pool_timeout=30,
+        pool_recycle=300,
+        pool_pre_ping=True,
+        pool_use_lifo=True,
         
-        # CRITICAL FOR AWS RDS: Recycle before NAT timeout (350s)
-        # Set to 5 minutes (300s) to be safe
-        pool_recycle=300,         # Recycle every 5 minutes!
-        
-        pool_pre_ping=True,       # Test before use
-        pool_use_lifo=True,       # Use most recent connection (keeps pool fresh)
-        
-        # AWS RDS-optimized connection settings
         connect_args={
             "sslmode": "require",
             "connect_timeout": 10,
-            
-            # CRITICAL: TCP keepalive MUST be less than NAT timeout (350s)
-            # We'll use 60s to be very aggressive
             "keepalives": 1,
-            "keepalives_idle": 60,      # Start sending keepalives after 60s idle
-            "keepalives_interval": 10,   # Send every 10s
-            "keepalives_count": 5,       # Try 5 times before giving up
-            
-            # Application identification
+            "keepalives_idle": 60,
+            "keepalives_interval": 10,
+            "keepalives_count": 5,
             "application_name": "flask_ai_backend",
-            
-            # Prevent hanging queries
             "options": "-c statement_timeout=30000 -c idle_in_transaction_session_timeout=60000"
         },
         
-        # Always rollback on connection return
         pool_reset_on_return='rollback',
-        
-        # Use READ COMMITTED to avoid lock issues
         isolation_level="READ COMMITTED",
         
-        # Execution options
         execution_options={
             "isolation_level": "READ COMMITTED"
         }
     )
-    
-    # Register disconnect handler
-    event.listen(engine, "handle_error", is_disconnect_error)
     
     # Test connection with retries
     max_retries = 3
@@ -223,11 +228,7 @@ def get_connection_stats():
 
 
 def execute_with_retry(func, max_retries=3, initial_backoff=0.1):
-    """
-    Execute database operation with automatic retry on connection errors
-    
-    Designed for AWS RDS intermittent connection issues
-    """
+    """Execute database operation with automatic retry on connection errors"""
     for attempt in range(max_retries):
         try:
             return func()
