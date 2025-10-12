@@ -45,8 +45,8 @@ group = None
 tmp_upload_dir = None
 
 # SSL (if not using nginx)
-# keyfile = "/path/to/key.pem"
-# certfile = "/path/to/cert.pem"
+keyfile = "/home/ubuntu/ai-backend/certs/privkey.pem"
+certfile = "/home/ubuntu/ai-backend/certs/fullchain.pem"
 
 # Preload app (load before forking workers)
 preload_app = True  # Saves memory, but harder to reload
