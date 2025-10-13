@@ -1,6 +1,6 @@
 import sqlalchemy
 from sqlalchemy import create_engine, Table, MetaData, event
-from sqlalchemy.pool import QueuePool, Pool
+from sqlalchemy.pool import NullPool, Pool
 from sqlalchemy.exc import DisconnectionError, OperationalError, DBAPIError
 from config import DB_URL, logger
 import time
@@ -109,7 +109,7 @@ try:
     engine = create_engine(
         f"postgresql+psycopg2://{DB_URL}",
         
-        poolclass=QueuePool,
+        poolclass=NullPool,
         pool_size=3,
         max_overflow=7,
         pool_timeout=30,
