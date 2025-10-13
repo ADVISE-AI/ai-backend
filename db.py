@@ -109,30 +109,14 @@ try:
     engine = create_engine(
         f"postgresql+psycopg2://{DB_URL}",
         
-        poolclass=NullPool,
-        pool_size=3,
-        max_overflow=7,
-        pool_timeout=30,
-        pool_recycle=300,
-        pool_pre_ping=True,
-        pool_use_lifo=True,
-        
+        poolclass=NullPool,  # No pooling - fresh connection each time
         connect_args={
             "sslmode": "require",
             "connect_timeout": 10,
             "keepalives": 1,
-            "keepalives_idle": 60,
+            "keepalives_idle": 30,
             "keepalives_interval": 10,
             "keepalives_count": 5,
-            "application_name": "flask_ai_backend",
-            "options": "-c statement_timeout=30000 -c idle_in_transaction_session_timeout=60000"
-        },
-        
-        pool_reset_on_return='rollback',
-        isolation_level="READ COMMITTED",
-        
-        execution_options={
-            "isolation_level": "READ COMMITTED"
         }
     )
     
