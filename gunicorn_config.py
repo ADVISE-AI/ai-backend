@@ -35,7 +35,7 @@ proc_name = "whatsapp_backend"
 # Server mechanics
 daemon = False
 pidfile = None
-preload_app = False  # Keep preload for memory efficiency
+preload_app = True  # Keep preload for memory efficiency
 
 # Hooks
 def on_starting(server):
