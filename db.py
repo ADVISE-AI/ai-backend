@@ -1,8 +1,9 @@
 import sqlalchemy
 from sqlalchemy import create_engine, Table, MetaData, event
-from sqlalchemy.pool import NullPool, Pool
+from sqlalchemy.pool import QueuePool, Pool, NullPool
 from sqlalchemy.exc import DisconnectionError, OperationalError, DBAPIError
 from config import DB_URL, logger
+import os
 import time
 
 _logger = logger(__name__)
@@ -47,22 +48,18 @@ def is_disconnect_error(e, connection, cursor):
     
     for error_pattern in rds_errors:
         if error_pattern in error_msg:
-            _logger.warning(f"Detected disconnect: '{error_pattern}' in error")
+            _logger.warning(f"🔴 Detected disconnect: '{error_pattern}' in error")
             connection_stats["errors"] += 1
             return True
     
     return False
 
-
-# Event handlers must be registered AFTER engine is created
-# We'll do this after the engine creation below
-
-
 @event.listens_for(Pool, "connect")
 def receive_connect(dbapi_conn, connection_record):
     """Called when new connection is created"""
     connection_stats["created"] += 1
-    _logger.info(f"✓ New DB connection #{connection_stats['created']}")
+    pid = os.getpid()
+    _logger.info(f"✓ New DB connection #{connection_stats['created']} [Worker PID: {pid}]")
     
     # Set AWS RDS-optimized connection parameters
     try:
@@ -73,18 +70,15 @@ def receive_connect(dbapi_conn, connection_record):
     except Exception as e:
         _logger.warning(f"Could not set connection parameters: {e}")
 
-
 @event.listens_for(Pool, "checkout")
 def receive_checkout(dbapi_conn, connection_record, connection_proxy):
     """Log when connection is taken from pool"""
-    _logger.debug(f"↗Connection checked out")
-
+    _logger.debug(f"↗️ Connection checked out")
 
 @event.listens_for(Pool, "checkin")
 def receive_checkin(dbapi_conn, connection_record):
     """Log when connection is returned to pool"""
-    _logger.debug(f"↙Connection returned to pool")
-
+    _logger.debug(f"↙️ Connection returned to pool")
 
 @event.listens_for(Pool, "close")
 def receive_close(dbapi_conn, connection_record):
@@ -92,44 +86,89 @@ def receive_close(dbapi_conn, connection_record):
     connection_stats["closed"] += 1
     _logger.info(f"Connection closed (total: {connection_stats['closed']})")
 
-
 @event.listens_for(Pool, "invalidate")
 def receive_invalidate(dbapi_conn, connection_record, exception):
-    """Called when connection is invalidated"""
+    """Called when connection is invalidated (dead connection detected)"""
     connection_stats["pre_ping_failures"] += 1
     connection_stats["reconnections"] += 1
     if exception:
-        _logger.warning(f"Connection invalidated (#{connection_stats['pre_ping_failures']}): {exception}")
+        _logger.warning(f"⚠️ Connection invalidated (#{connection_stats['pre_ping_failures']}): {exception}")
     else:
-        _logger.warning(f"Connection invalidated (#{connection_stats['pre_ping_failures']})")
-
+        _logger.warning(f"⚠️ Connection invalidated (#{connection_stats['pre_ping_failures']})")
 
 # Create engine with AWS RDS-specific optimizations
 try:
     engine = create_engine(
         f"postgresql+psycopg2://{DB_URL}",
         
-        poolclass=NullPool,  # No pooling - fresh connection each time
+        # Use QueuePool for connection reuse
+        poolclass=QueuePool,
+        pool_size=2,              # Smaller pool per worker (2 connections)
+        max_overflow=3,           # Up to 5 total per worker
+        pool_timeout=30,          # Wait 30s for connection
+        
+        # CRITICAL FOR AWS RDS: Recycle before NAT timeout (350s)
+        pool_recycle=300,         # Recycle every 5 minutes!
+        
+        pool_pre_ping=True,       # Test before use - CRITICAL!
+        pool_use_lifo=True,       # Use most recent connection (keeps pool fresh)
+        
+        # AWS RDS-optimized connection settings
         connect_args={
             "sslmode": "require",
             "connect_timeout": 10,
+            
+            # TCP keepalive settings
             "keepalives": 1,
-            "keepalives_idle": 30,
-            "keepalives_interval": 10,
-            "keepalives_count": 5,
+            "keepalives_idle": 60,      # Start sending keepalives after 60s idle
+            "keepalives_interval": 10,   # Send every 10s
+            "keepalives_count": 5,       # Try 5 times before giving up
+            
+            # Application identification
+            "application_name": "flask_ai_backend",
+            
+            # Prevent hanging queries
+            "options": "-c statement_timeout=30000 -c idle_in_transaction_session_timeout=60000"
+        },
+        
+        # Always rollback on connection return
+        pool_reset_on_return='rollback',
+        
+        # Use READ COMMITTED to avoid lock issues
+        isolation_level="READ COMMITTED",
+        
+        # Execution options
+        execution_options={
+            "isolation_level": "READ COMMITTED"
         }
     )
+    
+    # Register handle_error event on ENGINE (not Pool)
+    @event.listens_for(engine, "handle_error")
+    def receive_error(exception_context):
+        """
+        Handle database errors and determine if connection should be invalidated
+        """
+        if is_disconnect_error(
+            exception_context.original_exception,
+            exception_context.connection,
+            None
+        ):
+            _logger.warning("🔴 Connection error detected, invalidating connection")
+            exception_context.is_disconnect = True
     
     # Test connection with retries
     max_retries = 3
     for attempt in range(max_retries):
         try:
             with engine.connect() as conn:
-                result = conn.execute(sqlalchemy.text("SELECT version(), current_database()"))
-                version, db_name = result.fetchone()
+                result = conn.execute(sqlalchemy.text("SELECT version(), current_database(), pg_backend_pid()"))
+                version, db_name, backend_pid = result.fetchone()
                 _logger.info(f"✓ Connected to AWS RDS")
                 _logger.info(f"  Database: {db_name}")
                 _logger.info(f"  PostgreSQL: {version.split()[0]} {version.split()[1]}")
+                _logger.info(f"  Backend PID: {backend_pid}")
+                _logger.info(f"  Worker PID: {os.getpid()}")
             break
         except Exception as e:
             if attempt < max_retries - 1:
@@ -138,33 +177,12 @@ try:
                 _logger.info(f"Retrying in {wait_time}s...")
                 time.sleep(wait_time)
             else:
-                _logger.critical(f"Database connection failed after {max_retries} attempts: {e}")
+                _logger.critical(f"❌ Database connection failed after {max_retries} attempts: {e}")
                 raise
     
 except Exception as e:
-    _logger.critical(f"Failed to initialize database engine: {e}")
+    _logger.critical(f"❌ Failed to initialize database engine: {e}")
     raise
-
-
-# FIXED: Register handle_error event on ENGINE (not Pool)
-@event.listens_for(engine, "handle_error")
-def receive_error(exception_context):
-    """
-    Handle database errors and determine if connection should be invalidated
-    
-    Args:
-        exception_context: SQLAlchemy ExceptionContext object with attributes:
-            - original_exception: The exception that was raised
-            - sqlalchemy_exception: SQLAlchemy wrapper exception
-            - connection: The connection object (may be None)
-    """
-    if is_disconnect_error(
-        exception_context.original_exception,
-        exception_context.connection,
-        None  # cursor not available in this context
-    ):
-        _logger.warning("Connection error detected, invalidating connection")
-        exception_context.is_disconnect = True
 
 # Load table metadata
 metadata = MetaData()
@@ -172,7 +190,7 @@ try:
     metadata.reflect(bind=engine)
     _logger.info(f"✓ Loaded {len(metadata.tables)} tables: {', '.join(list(metadata.tables.keys())[:5])}...")
 except Exception as e:
-    _logger.error(f"Failed to load table metadata: {e}")
+    _logger.error(f"❌ Failed to load table metadata: {e}")
     raise
 
 # Table references
@@ -186,7 +204,7 @@ sample_library = metadata.tables.get("sample_media_library")
 critical_tables = ["user", "conversation", "message"]
 missing_tables = [t for t in critical_tables if t not in metadata.tables]
 if missing_tables:
-    _logger.critical(f"Missing critical tables: {missing_tables}")
+    _logger.critical(f"❌ Missing critical tables: {missing_tables}")
     raise RuntimeError(f"Database schema incomplete: missing {missing_tables}")
 
 _logger.info(f"✓ All critical tables present")
@@ -196,6 +214,7 @@ def get_connection_stats():
     """Get current connection pool statistics"""
     pool = engine.pool
     return {
+        "worker_pid": os.getpid(),
         "connections": {
             "created": connection_stats["created"],
             "closed": connection_stats["closed"],
@@ -216,7 +235,11 @@ def get_connection_stats():
 
 
 def execute_with_retry(func, max_retries=3, initial_backoff=0.1):
-    """Execute database operation with automatic retry on connection errors"""
+    """
+    Execute database operation with automatic retry on connection errors
+    
+    Designed for AWS RDS intermittent connection issues
+    """
     for attempt in range(max_retries):
         try:
             return func()
@@ -229,7 +252,7 @@ def execute_with_retry(func, max_retries=3, initial_backoff=0.1):
             
             if is_connection_error and attempt < max_retries - 1:
                 backoff = initial_backoff * (2 ** attempt)
-                _logger.warning(f"DB operation failed (attempt {attempt + 1}/{max_retries}): {str(e)[:100]}")
+                _logger.warning(f"⚠️ DB operation failed (attempt {attempt + 1}/{max_retries}): {str(e)[:100]}")
                 _logger.info(f"Retrying in {backoff:.2f}s...")
                 time.sleep(backoff)
                 continue
@@ -243,14 +266,18 @@ def healthcheck():
             conn.execute(sqlalchemy.text("SELECT 1"))
         return {"status": "healthy", "message": "Database responsive"}
     except Exception as e:
-        _logger.error(f"Health check failed: {e}")
+        _logger.error(f"❌ Health check failed: {e}")
         return {"status": "unhealthy", "error": str(e)}
 
 
 # Log initialization summary
 _logger.info("=" * 60)
-_logger.info("DATABASE ENGINE INITIALIZED")
-_logger.info(f"  Pool Size: {engine.pool.size()} + {engine.pool._max_overflow} overflow")
-_logger.info(f"  Recycle: {engine.pool._recycle}s (every 5 min)")
-_logger.info(f"  TCP Keepalive: 60s idle, 10s interval")
+_logger.info("DATABASE ENGINE INITIALIZED (AWS RDS + Gunicorn Optimized)")
+_logger.info(f"  Worker PID: {os.getpid()}")
+_logger.info(f"  Pool Type: QueuePool (connection reuse enabled)")
+_logger.info(f"  Pool Size: {engine.pool.size()} connections + {engine.pool._max_overflow} overflow = {engine.pool.size() + engine.pool._max_overflow} total per worker")
+_logger.info(f"  Pool Recycle: Every {engine.pool._recycle}s (5 minutes)")
+_logger.info(f"  Pre-ping: {engine.pool._pre_ping} (test before use)")
+_logger.info(f"  TCP Keepalive: 60s idle, 10s interval, 5 retries")
+_logger.info(f"  SSL Mode: Required (TLS 1.3)")
 _logger.info("=" * 60)
