@@ -54,25 +54,8 @@ def is_disconnect_error(e, connection, cursor):
     return False
 
 
-# FIXED: Proper event handler signature for handle_error
-@event.listens_for(Pool, "handle_error")
-def receive_error(exception_context):
-    """
-    Handle database errors and determine if connection should be invalidated
-    
-    Args:
-        exception_context: SQLAlchemy ExceptionContext object with attributes:
-            - original_exception: The exception that was raised
-            - sqlalchemy_exception: SQLAlchemy wrapper exception
-            - connection: The connection object (may be None)
-    """
-    if is_disconnect_error(
-        exception_context.original_exception,
-        exception_context.connection,
-        None  # cursor not available in this context
-    ):
-        _logger.warning("Connection error detected, invalidating connection")
-        exception_context.is_disconnect = True
+# Event handlers must be registered AFTER engine is created
+# We'll do this after the engine creation below
 
 
 @event.listens_for(Pool, "connect")
@@ -177,6 +160,27 @@ try:
 except Exception as e:
     _logger.critical(f"Failed to initialize database engine: {e}")
     raise
+
+
+# FIXED: Register handle_error event on ENGINE (not Pool)
+@event.listens_for(engine, "handle_error")
+def receive_error(exception_context):
+    """
+    Handle database errors and determine if connection should be invalidated
+    
+    Args:
+        exception_context: SQLAlchemy ExceptionContext object with attributes:
+            - original_exception: The exception that was raised
+            - sqlalchemy_exception: SQLAlchemy wrapper exception
+            - connection: The connection object (may be None)
+    """
+    if is_disconnect_error(
+        exception_context.original_exception,
+        exception_context.connection,
+        None  # cursor not available in this context
+    ):
+        _logger.warning("Connection error detected, invalidating connection")
+        exception_context.is_disconnect = True
 
 # Load table metadata
 metadata = MetaData()
