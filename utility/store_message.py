@@ -1,8 +1,8 @@
 from config import logger
 from db import engine, message, conversation
 from sqlalchemy import insert, select
-from bot import graph
 from datetime import datetime
+import bot
 import json
 import time
 
@@ -97,6 +97,7 @@ def sync_operator_message_to_graph(user_ph: str, message_text: str):
     }
     
     # Update the graph state directly
+    graph = bot.get_graph()
     current_state = graph.get_state(config)
     updated_messages = current_state.values.get("messages", []) + [operator_message]
     

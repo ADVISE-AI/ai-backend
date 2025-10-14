@@ -1,7 +1,7 @@
 from flask import Blueprint, request
 from config import logger, VERIFY_TOKEN
 from utility import normalize_webhook_payload, is_duplicate, get_message_buffer
-from tasks import process_message_task, update_message_status_task, check_buffer_task
+from tasks import update_message_status_task, check_buffer_task
 import time
 import json
 
