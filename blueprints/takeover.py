@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from config import logger
 from db import engine, conversation
 from sqlalchemy import select, update
-from bot import graph
+import bot
 import json
 takeover_bp = Blueprint('takeover', __name__)
 _logger = logger(__name__)
@@ -35,6 +35,7 @@ def takeover_by_human():
                 # Update LangGraph state
                 _logger.info(f"Updating LangGraph state for {phone}")
                 config = {"configurable": {"thread_id": phone}}
+                graph = bot.get_graph()
                 graph.update_state(config, {"operator_active": True})
                 _logger.info(f"LangGraph state updated for {phone}")
                 
