@@ -2,10 +2,11 @@ import sqlalchemy
 from sqlalchemy import create_engine, Table, MetaData
 from sqlalchemy.pool import QueuePool
 from config import DB_URL, logger
+import threading
 import os
 
 _logger = logger(__name__)
-
+_init_lock = threading.Lock()
 # Will be initialized lazily per-process
 _engine = None
 _metadata = None
@@ -22,11 +23,15 @@ def _initialize_db():
     # If engine exists but we're in a different process (after fork)
     if _engine is not None and _process_id != current_pid:
         _logger.info(f"Fork detected (PID {_process_id} → {current_pid}), creating new engine")
-        _engine.dispose()
-        _engine = None
-        _metadata = None
-        _tables = {}
-    
+        try:
+            _engine.dispose()
+        except Exception as e:
+            _logger.warning(f"Failed to dispose old engine: {e}")
+        finally:
+            _engine = None
+            _metadata = None
+            _tables = {} 
+
     if _engine is None:
         _logger.info(f"Initializing database for PID {current_pid}")
         
@@ -75,12 +80,13 @@ def get_engine():
     return _engine
 
 
-# Export tables as module-level variables (initialized on first access)
 def __getattr__(name):
-    """Lazy attribute access for tables"""
     if name in ('engine', 'user', 'user_conversation', 'message', 'conversation', 'sample_library'):
         if _engine is None or _process_id != os.getpid():
-            _initialize_db()
+            with _init_lock:
+                # Double-check pattern
+                if _engine is None or _process_id != os.getpid():
+                    _initialize_db()
         
         if name == 'engine':
             return _engine

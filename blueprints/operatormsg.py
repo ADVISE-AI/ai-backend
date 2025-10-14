@@ -3,7 +3,7 @@ from config import logger, BACKEND_BASE_URL
 from utility import store_operator_message
 from utility.whatsapp import send_message, upload_media, send_media, typing_indicator
 from typing import Tuple, Optional, Dict
-from db import engine, conversation, message, execute_with_retry
+from db import engine, conversation, message
 from sqlalchemy import select
 from sqlalchemy.exc import OperationalError, DBAPIError
 import tempfile

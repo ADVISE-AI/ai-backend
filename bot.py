@@ -21,6 +21,9 @@ from psycopg import Connection
 import os
 _logger = logger(__name__)
 
+_checkpointer = None
+_langgraph_conn = None
+_langgraph_pid = None
 
 def get_checkpointer():
     """Get or create LangGraph checkpointer (process-safe)"""
