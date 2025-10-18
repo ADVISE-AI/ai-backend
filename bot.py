@@ -26,13 +26,25 @@ _checkpointer = None
 _langgraph_conn = None
 _langgraph_pid = None
 
+def is_connection_alive(conn):
+    """Check if PostgreSQL connection is still alive"""
+    if conn is None:
+        return False
+    try:
+        # Quick health check
+        conn.execute("SELECT 1").fetchone()
+        return True
+    except Exception as e:
+        _logger.warning(f"Connection health check failed: {e}")
+        return False
+
 def get_checkpointer():
-    """Get or create LangGraph checkpointer (process-safe)"""
+    """Get or create LangGraph checkpointer (process-safe with health checks)"""
     global _checkpointer, _langgraph_conn, _langgraph_pid
     
     current_pid = os.getpid()
     
-    # If connection exists but we're in different process
+    # Check 1: Different process (fork detected)
     if _langgraph_conn is not None and _langgraph_pid != current_pid:
         _logger.info(f"LangGraph: Fork detected (PID {_langgraph_pid} → {current_pid})")
         try:
@@ -42,10 +54,21 @@ def get_checkpointer():
         _langgraph_conn = None
         _checkpointer = None
     
+    # Check 2: Connection exists but is dead/closed
+    elif _langgraph_conn is not None and not is_connection_alive(_langgraph_conn):
+        _logger.warning(f"LangGraph: Dead connection detected for PID {current_pid}, recreating...")
+        try:
+            _langgraph_conn.close()
+        except:
+            pass
+        _langgraph_conn = None
+        _checkpointer = None
+    
+    # Create new connection if needed
     if _checkpointer is None:
         _logger.info(f"Creating LangGraph checkpointer for PID {current_pid}")
         
-        # FIXED: Proper SSL and connection configuration
+        # Proper SSL and connection configuration
         conn_params = make_conninfo(
             f"postgresql://{DB_URL}",
             sslmode='require',
@@ -54,7 +77,6 @@ def get_checkpointer():
             keepalives_idle=30,
             keepalives_interval=10,
             keepalives_count=5,
-            # TCP settings to prevent connection drops
             tcp_user_timeout=30000,  # 30 seconds
         )
         
@@ -70,6 +92,7 @@ def get_checkpointer():
             _logger.info("LangGraph connection test successful")
         except Exception as e:
             _logger.error(f"LangGraph connection test failed: {e}")
+            _langgraph_conn = None
             raise
         
         _checkpointer = PostgresSaver(_langgraph_conn)
@@ -169,6 +192,7 @@ graph_builder.add_edge("gemini", END)
 
 
 def get_graph():
+    """Get compiled graph with health-checked checkpointer"""
     checkpointer = get_checkpointer()
     return graph_builder.compile(checkpointer=checkpointer)
 
