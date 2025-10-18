@@ -17,6 +17,7 @@ from agent_tools.request_for_intervention import callIntervention
 from utility.content_block import content_formatter
 
 from psycopg import Connection
+from psycopg.conninfo import make_conninfo
 
 import os
 _logger = logger(__name__)
@@ -44,11 +45,32 @@ def get_checkpointer():
     if _checkpointer is None:
         _logger.info(f"Creating LangGraph checkpointer for PID {current_pid}")
         
-        _langgraph_conn = Connection.connect(
+        # FIXED: Proper SSL and connection configuration
+        conn_params = make_conninfo(
             f"postgresql://{DB_URL}",
-            autocommit=True,
-            prepare_threshold=0
+            sslmode='require',
+            connect_timeout=10,
+            keepalives=1,
+            keepalives_idle=30,
+            keepalives_interval=10,
+            keepalives_count=5,
+            # TCP settings to prevent connection drops
+            tcp_user_timeout=30000,  # 30 seconds
         )
+        
+        _langgraph_conn = Connection.connect(
+            conn_params,
+            autocommit=True,
+            prepare_threshold=0,
+        )
+        
+        # Test connection immediately
+        try:
+            _langgraph_conn.execute("SELECT 1").fetchone()
+            _logger.info("LangGraph connection test successful")
+        except Exception as e:
+            _logger.error(f"LangGraph connection test failed: {e}")
+            raise
         
         _checkpointer = PostgresSaver(_langgraph_conn)
         
@@ -119,7 +141,7 @@ with open("gemini_system_prompt.txt", "r") as f1:
 def gemini_node(state: State):
     ai_resp = gemini_agent.invoke({
         "system_message": GEMINI_SYSTEM_PROMPT,
-        "messages": state['messages']  # Use truncated history
+        "messages": state['messages']
     })
 
     return {
@@ -204,4 +226,3 @@ def stream_graph_updates(user_ph: str, user_input: dict) -> dict:
     
     _logger.info(f"Final response after {turn_count} turns: {final_response}")
     return final_response
-
