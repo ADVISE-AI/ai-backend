@@ -5,6 +5,7 @@ from utility import message_router
 from utility.message_buffer import get_message_buffer
 from db import engine, message as message_table
 from sqlalchemy import update
+import bot
 
 _logger = logger(__name__)
 
@@ -23,17 +24,17 @@ celery_app.conf.update(
     
     # Task execution
     task_track_started=True,
-    task_time_limit=300,  # 5 minutes hard limit
-    task_soft_time_limit=240,  # 4 minutes soft limit
-    task_acks_late=True,  # Acknowledge after task completes
-    worker_prefetch_multiplier=1,  
+    task_time_limit=300,
+    task_soft_time_limit=240,
+    task_acks_late=True,
+    worker_prefetch_multiplier=1,
     
     # Reliability
     task_reject_on_worker_lost=True,
     task_acks_on_failure_or_timeout=True,
     
     # Performance
-    worker_max_tasks_per_child=100,  # Restart worker after 100 tasks
+    worker_max_tasks_per_child=100,
     worker_disable_rate_limits=True,
     
     # Monitoring
@@ -41,30 +42,95 @@ celery_app.conf.update(
     task_send_sent_event=True,
 )
 
+@celery_app.task(
+    name='tasks.update_langgraph_state',
+    bind=True,
+    max_retries=3,
+    default_retry_delay=5,
+    autoretry_for=(Exception,),
+    retry_backoff=True
+)
+def update_langgraph_state_task(self, phone: str, updates: dict):
+    """
+    Update LangGraph state in background (prevents blocking Gunicorn workers)
+    
+    Args:
+        phone: User phone number (thread_id)
+        updates: Dict of state updates (e.g., {"operator_active": True})
+    
+    Returns:
+        dict: Success/failure status
+    """
+    try:
+        _logger.info(f"[Celery-{self.request.id[:8]}] Updating LangGraph state for {phone}")
+        
+        config = {"configurable": {"thread_id": phone}}
+        graph = bot.get_graph()
+        
+        # Update state
+        graph.update_state(config, updates)
+        
+        _logger.info(f"[Celery-{self.request.id[:8]}] LangGraph state updated for {phone}")
+        return {"status": "success", "phone": phone, "updates": updates}
+        
+    except Exception as e:
+        _logger.error(f"[Celery-{self.request.id[:8]}] LangGraph update failed for {phone}: {e}", exc_info=True)
+        raise
+
+
+@celery_app.task(
+    name='tasks.sync_operator_message_to_graph',
+    bind=True,
+    max_retries=3,
+    default_retry_delay=5
+)
+def sync_operator_message_to_graph_task(self, phone: str, message_text: str):
+    """
+    Sync operator message to LangGraph conversation state
+    
+    Args:
+        phone: User phone number
+        message_text: Operator's message content
+    """
+    try:
+        _logger.info(f"[Celery-{self.request.id[:8]}] Syncing operator message to graph for {phone}")
+        
+        config = {"configurable": {"thread_id": phone}}
+        graph = bot.get_graph()
+        
+        # Get current state
+        current_state = graph.get_state(config)
+        
+        # Add operator message
+        operator_message = {
+            "role": "assistant", 
+            "content": f"[OPERATOR MESSAGE]: {message_text}"
+        }
+        
+        updated_messages = current_state.values.get("messages", []) + [operator_message]
+        graph.update_state(config, {"messages": updated_messages})
+        
+        _logger.info(f"[Celery-{self.request.id[:8]}] Operator message synced to graph for {phone}")
+        return {"status": "success", "phone": phone}
+        
+    except Exception as e:
+        _logger.error(f"[Celery-{self.request.id[:8]}] Operator message sync failed for {phone}: {e}", exc_info=True)
+        raise
+
 @celery_app.task(name='tasks.check_buffer')
 def check_buffer_task(phone: str):
-    """
-    Check if buffer should be processed for a user
-    
-    This task is scheduled after debounce_time. If user is still typing,
-    it reschedules itself. Otherwise, it processes the buffer.
-    """
+    """Check if buffer should be processed for a user"""
     redis_buffer = get_message_buffer()
     
     _logger.info(f"Checking buffer for {phone}")
     
-    # Check if enough time has passed
     if redis_buffer.should_process(phone):
-        # Get all messages
         messages = redis_buffer.get_messages(phone)
         
         if messages:
             _logger.info(f"Processing {len(messages)} buffered messages for {phone}")
-            
-            # Combine messages
             combined_message = _combine_messages(messages)
             
-            # Queue for processing
             process_message_task.apply_async(
                 args=[combined_message],
                 queue='messages',
@@ -73,7 +139,6 @@ def check_buffer_task(phone: str):
         else:
             _logger.warning(f"No messages in buffer for {phone}")
     else:
-        # User still typing, check again in 1 second
         buffer_size = redis_buffer.get_buffer_size(phone)
         _logger.info(f"User {phone} still typing. Buffer size: {buffer_size}. Checking again in 1s")
         
@@ -86,25 +151,16 @@ def check_buffer_task(phone: str):
 
 
 def _combine_messages(messages: list) -> dict:
-    """
-    Combine multiple messages into a single normalized message
-    
-    Logic:
-    - If all text: combine with newlines
-    - If has media: use last media, combine all text as caption
-    - Keep metadata from first message
-    """
+    """Combine multiple messages into a single normalized message"""
     if len(messages) == 1:
         return messages[0]
     
     first_msg = messages[0]
     last_msg = messages[-1]
     
-    # Separate text and media messages
     text_messages = [m for m in messages if m.get('class') == 'text']
     media_messages = [m for m in messages if m.get('class') == 'media']
     
-    # All text messages
     if text_messages and not media_messages:
         combined_text = "\n".join([
             m['from']['message'] 
@@ -126,11 +182,9 @@ def _combine_messages(messages: list) -> dict:
             'context': last_msg.get('context')
         }
     
-    # Has media messages
     elif media_messages:
         last_media = media_messages[-1]
         
-        # Combine all text (from text messages and media captions)
         all_text = []
         for m in text_messages:
             if m['from'].get('message'):
@@ -157,7 +211,6 @@ def _combine_messages(messages: list) -> dict:
             'context': last_media.get('context')
         }
     
-    # Fallback
     return last_msg
 
 
@@ -165,22 +218,14 @@ def _combine_messages(messages: list) -> dict:
     bind=True, 
     name='tasks.process_message',
     max_retries=3,
-    default_retry_delay=10,  # Retry after 10 seconds
+    default_retry_delay=10,
     autoretry_for=(Exception,),
     retry_backoff=True,
     retry_backoff_max=60,
     retry_jitter=True
 )
 def process_message_task(self, normalized_data: dict):
-    """
-    Background task to process incoming WhatsApp message with AI
-    
-    Args:
-        normalized_data: Normalized webhook payload
-        
-    Returns:
-        dict: Processing result with status
-    """
+    """Background task to process incoming WhatsApp message with AI"""
     phone = normalized_data['from']['phone']
     msg_id = normalized_data['from']['message_id']
     
@@ -200,18 +245,12 @@ def process_message_task(self, normalized_data: dict):
         
     except Exception as e:
         _logger.error(f"[Celery-{self.request.id[:8]}] Failed {msg_id}: {e}", exc_info=True)
-        
         raise
 
 
 @celery_app.task(name='tasks.update_message_status')
 def update_message_status_task(status_data: dict):
-    """
-    Update message delivery status from WhatsApp webhook
-    
-    Args:
-        status_data: Status update payload
-    """
+    """Update message delivery status from WhatsApp webhook"""
     try:
         msg_id = status_data.get('id')
         status = status_data.get('status')
@@ -245,10 +284,7 @@ def update_message_status_task(status_data: dict):
         return {"status": "failed", "error": str(e)}
 
 
-
-
-
-# Task routing to different queues
+# Task routing
 celery_app.conf.task_routes = {
     'tasks.process_message': {
         'queue': 'messages',
@@ -258,6 +294,14 @@ celery_app.conf.task_routes = {
         'queue': 'status',
         'routing_key': 'message.status',
     },
+    'tasks.update_langgraph_state': {
+        'queue': 'state',  # NEW: Dedicated queue for state updates
+        'routing_key': 'state.update',
+    },
+    'tasks.sync_operator_message_to_graph': {
+        'queue': 'state',
+        'routing_key': 'state.sync',
+    },
 }
 
 
@@ -266,7 +310,6 @@ celery_app.conf.task_routes = {
 def task_failure_handler(sender=None, task_id=None, exception=None, **kwargs):
     """Log critical failures"""
     _logger.critical(f"🚨 Task {task_id} failed: {exception}")
-    # TODO: Send to monitoring system (Sentry, PagerDuty, etc.)
 
 
 @task_success.connect
