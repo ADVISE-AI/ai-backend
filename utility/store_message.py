@@ -2,7 +2,6 @@ from config import logger
 from db import engine, message, conversation
 from sqlalchemy import insert, select
 from datetime import datetime
-from tasks import sync_operator_message_to_graph_task
 import json
 import time
 
@@ -60,6 +59,8 @@ def store_operator_message(message_text: str, user_ph: str, external_msg_id: str
     CRITICAL FIX: Graph sync now happens asynchronously via Celery task.
     This prevents blocking the Gunicorn worker on LangGraph state updates.
     """
+    from tasks import sync_operator_message_to_graph_task
+    
     with engine.begin() as conn:
         # Get conversation
         result = conn.execute(
@@ -105,6 +106,8 @@ def sync_operator_message_to_graph(user_ph: str, message_text: str):
     
     If called directly, it will queue the Celery task instead.
     """
+    from tasks import sync_operator_message_to_graph_task
+
     _logger.warning(
         "sync_operator_message_to_graph() called directly - "
         "this is deprecated. Use Celery task instead. Queuing task now..."
