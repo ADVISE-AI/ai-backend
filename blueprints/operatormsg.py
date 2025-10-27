@@ -98,12 +98,13 @@ def store_operator_message_with_retry(message_text: str, phone: str, message_id:
     """
     Store operator message with automatic retry on connection errors
     
-    This wraps the store function to handle transient DB issues
+    IMPORTANT: This already uses async Celery task for graph sync via store_operator_message()
     """
     max_retries = 3
     
     for attempt in range(max_retries):
         try:
+            # This internally queues sync_operator_message_to_graph_task via Celery
             store_operator_message(message_text, phone, message_id, **kwargs)
             return  # Success!
             
@@ -127,7 +128,12 @@ def store_operator_message_with_retry(message_text: str, phone: str, message_id:
    
 @operator_bp.route("/operatormsg", methods=["GET","POST"])
 def operatormsg():
-    """Handle operator messages with full context sync"""
+    """
+    Handle operator messages with full context sync
+    
+    CRITICAL FIX: Graph sync now happens asynchronously via Celery task
+    in store_operator_message() → sync_operator_message_to_graph_task
+    """
     if request.method == "POST":
         data = request.get_json(force=True)
         
@@ -166,13 +172,16 @@ def operatormsg():
                     response = send_media(media_type, phone, media_id, message)
                     message_id = response.get("messages", [{}])[0].get('id') if response else None
 
-                    # Store with retry logic
+                    # CRITICAL FIX: This now uses async Celery task internally
+                    # store_operator_message() → sync_operator_message_to_graph_task.apply_async()
                     store_operator_message_with_retry(
                         message, phone, message_id, 
                         media_id=media_id, 
                         mime_type=mime_type, 
                         sender_id=sender_id
                     )
+                    
+                    _logger.info(f"Operator media message queued for graph sync: {phone}")
                     
                     return jsonify({"status": "success", "message_id": message_id})
 
@@ -193,11 +202,17 @@ def operatormsg():
                 response = send_message(phone, message)
                 message_id = response.get("messages", [{}])[0].get('id') if response else None
 
-                # Store with retry logic - THIS IS THE KEY CHANGE
+                # CRITICAL FIX: This now uses async Celery task internally
+                # Graph sync happens via sync_operator_message_to_graph_task in background
                 store_operator_message_with_retry(message, phone, message_id, sender_id=sender_id)
+                
+                _logger.info(f"Operator text message queued for graph sync: {phone}")
 
                 return jsonify({"status": "success", "message_id": message_id}), 200
 
             except Exception as e:
                 _logger.error(f"Failed to send operator message: {e}")
                 return jsonify({"status": "error", "error": str(e)}), 500
+    
+    elif request.method == "GET":
+        return "THIS ENDPOINT IS UP AND RUNNING", 200

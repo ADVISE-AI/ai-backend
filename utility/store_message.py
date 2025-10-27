@@ -2,7 +2,7 @@ from config import logger
 from db import engine, message, conversation
 from sqlalchemy import insert, select
 from datetime import datetime
-import bot
+from tasks import sync_operator_message_to_graph_task
 import json
 import time
 
@@ -37,27 +37,29 @@ def store_user_message(clean_data: dict, conversation_id: int, conn=None):
 
     try:
         if conn:
-            # Reuse existing connection/transaction
             conn.execute(insert(message).values(row))
         else:
-            # Create new transaction
             with engine.begin() as conn:
                 conn.execute(insert(message).values(row))
     except Exception as e:
         _logger.error(f"Failed to insert into DataBase: {e}")
 
-def store_operator_message(message_text: str, user_ph: str, external_msg_id: str = None, **kwargs):
-    """Store operator message and sync to LangGraph
-        Args:
-            message_text: Text content of the operator message
-            user_ph: Phone number of the user
-            external_msg_id: Message ID returned by WhatsApp API
-            `**kwargs`: Additional keyword arguments
-        
-            NOTE: `**kwargs` can include `media_id` and `mime_type` for media messages
-            
-        Returns: `None` """
 
+def store_operator_message(message_text: str, user_ph: str, external_msg_id: str = None, **kwargs):
+    """
+    Store operator message and sync to LangGraph (async via Celery)
+    
+    Args:
+        message_text: Text content of the operator message
+        user_ph: Phone number of the user
+        external_msg_id: Message ID returned by WhatsApp API
+        **kwargs: Additional keyword arguments (media_id, mime_type, sender_id)
+        
+    Returns: None
+    
+    CRITICAL FIX: Graph sync now happens asynchronously via Celery task.
+    This prevents blocking the Gunicorn worker on LangGraph state updates.
+    """
     with engine.begin() as conn:
         # Get conversation
         result = conn.execute(
@@ -82,23 +84,33 @@ def store_operator_message(message_text: str, user_ph: str, external_msg_id: str
             "provider_ts": datetime.fromtimestamp(int(time.time())),
         }
         conn.execute(insert(message).values(row))
-        
-        # CRITICAL: Sync to LangGraph state
-        sync_operator_message_to_graph(user_ph, message_text)
+        _logger.info(f"Operator message stored in DB for {user_ph}")
+    
+    # CRITICAL FIX: Offload graph sync to Celery
+    # This prevents blocking on LangGraph state updates
+    sync_operator_message_to_graph_task.apply_async(
+        args=[user_ph, message_text],
+        queue='state',
+        priority=7  # High priority (but lower than takeover/handback)
+    )
+    _logger.info(f"Queued operator message sync to graph for {user_ph}")
+
 
 def sync_operator_message_to_graph(user_ph: str, message_text: str):
-    """Add operator message to LangGraph conversation state"""
-    config = {"configurable": {"thread_id": user_ph}}
+    """
+    DEPRECATED: Use sync_operator_message_to_graph_task instead
     
-    # Create operator message in LangGraph format
-    operator_message = {
-        "role": "assistant", 
-        "content": f"[OPERATOR MESSAGE]: {message_text}"
-    }
+    This function is kept for backward compatibility but should not be called directly.
+    All graph syncs now go through Celery to prevent blocking.
     
-    # Update the graph state directly
-    graph = bot.get_graph()
-    current_state = graph.get_state(config)
-    updated_messages = current_state.values.get("messages", []) + [operator_message]
-    
-    graph.update_state(config, {"messages": updated_messages})
+    If called directly, it will queue the Celery task instead.
+    """
+    _logger.warning(
+        "sync_operator_message_to_graph() called directly - "
+        "this is deprecated. Use Celery task instead. Queuing task now..."
+    )
+    sync_operator_message_to_graph_task.apply_async(
+        args=[user_ph, message_text],
+        queue='state',
+        priority=7
+    )
