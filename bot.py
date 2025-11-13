@@ -114,23 +114,68 @@ class State(TypedDict):
     operator_active: bool
 
 @tool("RespondWithMedia")
-def RespondWithMedia(media_description: str, * ,config: RunnableConfig) -> dict:
+def RespondWithMedia(category: str, subcategory: str = "", *, config: RunnableConfig) -> dict:
     """
-    Send the user WhatsApp media based on file type.
-    Args:
-         media_description: Choose one of 'ai', '3d', '2d', 'info', 'customer_review', 'intro', 'bride_groom_sample'.
-    Extra notes for the LLM:
-        ai, 3d, 2d are videos
-        File 'intro' is an image which contains introduction about Joy Invite and why it is better than other businesses
-        File 'info' is an audio which contains information about the procedure to be followed by the user to order a digital invite
-        File 'customer_review' is an image which contains a screenshot of a chat from a previous customer who is thanking us genuinely for our service
-        File 'bride_groom_sample' is an image which contains an example picture of bride and groom. 
+    These are the supported categories. Only SOME categories have subcategories. 
+LLM MUST follow this mapping EXACTLY:
+
+------------------------------------------------------------
+CATEGORIES WITH SUBCATEGORIES  (LLM MUST pass both arguments)
+------------------------------------------------------------
+
+1. south india
+    valid subcategories: 2d, 3d, ai
+
+2. north india
+    valid subcategories: 2d, 3d, ai
+
+3. punjabi
+    valid subcategories: 2d, 3d
+
+4. engagement
+    valid subcategories: 2d, 3d
+
+
+------------------------------------------------------------
+CATEGORIES WITHOUT SUBCATEGORIES 
+(LLM MUST pass subcategory=""; do NOT invent subcategories)
+------------------------------------------------------------
+
+- save the date  
+- welcome board  
+- wedding anniversary  
+- janoi  
+- muslim  
+- wardrobe  
+- story  
+- house warming  
+- baby shower  
+- mundan  
+- birthday  
+
+
+------------------------------------------------------------
+RULE SUMMARY (LLM MUST FOLLOW):
+------------------------------------------------------------
+
+1. If category supports subcategories → ALWAYS pass:
+       category="<name>", subcategory="<2d|3d|ai>"
+
+2. If category does NOT support subcategories → ALWAYS pass:
+       category="<name>", subcategory=""
+
+3. Use ALL LOWERCASE.  
+   Only ONE WORD per argument (spaces must be removed or replaced with hyphens/underscores if needed).
+
+4. Do NOT guess or invent new categories or subcategories.
+
+5. Only use categories and subcategories EXACTLY as listed above.
     """
+    _logger.info(f"[MEDIA TOOL] Called with category='{category}', subcategory='{subcategory}', user_ph={user_ph}")
     user_ph = config.get("configurable", {}).get("thread_id")
-
-    tool_response = send_media_tool(media_description=media_description, user_ph = user_ph)
-
+    tool_response = send_media_tool(category=category, subcategory=subcategory, user_ph=user_ph)
     return tool_response
+
     
 
 @tool("RequestIntervention")
