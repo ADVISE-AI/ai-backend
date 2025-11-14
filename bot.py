@@ -4,7 +4,7 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import AnyMessage, add_messages
 from langchain_core.messages import ToolMessage
 from langchain.chat_models import init_chat_model
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnableConfig
 from langgraph.prebuilt import ToolNode, InjectedState
 from langchain_core.tools import tool, InjectedToolCallId
@@ -371,6 +371,7 @@ def stream_graph_updates(user_ph: str, user_input: dict) -> dict:
     
     try:
         # Step 1: Format content
+        import time
         t0 = time.time()
         content = content_formatter(user_input)
         t1 = time.time()
