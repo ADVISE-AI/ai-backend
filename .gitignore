@@ -9,7 +9,7 @@ utility/__pycache__/
 utility/whatsapp/__pycache__/
 
 docs/
-Media_chaching_docs/
+Media_caching_docs/
 prompt_docs/
 SSL_DOCS/
 test_celery/
