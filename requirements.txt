@@ -1,0 +1,36 @@
+# Core Web Framework
+Flask==3.1.1
+gunicorn==23.0.0
+python-dotenv==1.1.1
+
+# Async Task Queue
+celery==5.5.3
+redis==6.4.0
+
+# Database
+SQLAlchemy==2.0.41
+psycopg==3.2.9
+psycopg-binary==3.2.10
+psycopg2-binary==2.9.10
+
+# LangChain & AI
+langchain==0.3.27
+langchain-core==0.3.75
+langchain-google-genai==2.1.10
+langgraph==0.6.1
+langgraph-checkpoint==2.1.1
+langgraph-checkpoint-postgres==2.0.23
+
+# HTTP Requests
+requests==2.32.4
+httpx==0.28.1
+
+# Data Validation
+pydantic==2.11.7
+
+# Utilities
+python-dateutil==2.9.0.post0
+tenacity==9.1.2
+
+# Logging (optional but recommended)
+coloredlogs==15.0.1

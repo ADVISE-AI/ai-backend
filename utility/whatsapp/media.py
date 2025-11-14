@@ -1,0 +1,435 @@
+"""
+WhatsApp media handling functions (upload, send, download)
+"""
+import os
+import json
+import requests
+import mimetypes
+import time
+from typing import Optional, Dict, Tuple
+from datetime import datetime
+from config import logger
+from .constants import API_BASE, BASE_URL, get_headers, get_auth_header
+from .errors import handle_error
+
+_logger = logger(__name__)
+
+# Retry configuration
+MAX_RETRIES = 3
+BASE_BACKOFF_SECONDS = 2
+
+def get_mime_type(file_path: str) -> str:
+    """
+    Detect MIME type from file path
+    
+    Args:
+        file_path: Path to the file
+        
+    Returns:
+        MIME type string
+    """
+    # Try to guess from extension
+    mime_type, _ = mimetypes.guess_type(file_path)
+    
+    if mime_type:
+        return mime_type
+    
+    # Fallback: detect from extension manually
+    ext = os.path.splitext(file_path)[1].lower()
+    
+    mime_map = {
+        # Images
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.webp': 'image/webp',
+        
+        # Videos
+        '.mp4': 'video/mp4',
+        '.3gp': 'video/3gpp',
+        
+        # Audio
+        '.aac': 'audio/aac',
+        '.m4a': 'audio/mp4',
+        '.mp3': 'audio/mpeg',
+        '.amr': 'audio/amr',
+        '.ogg': 'audio/ogg',
+        
+        # Documents
+        '.pdf': 'application/pdf',
+        '.doc': 'application/msword',
+        '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        '.xls': 'application/vnd.ms-excel',
+        '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        '.ppt': 'application/vnd.ms-powerpoint',
+        '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    }
+    
+    return mime_map.get(ext, 'application/octet-stream')
+
+
+def upload_media(file_path: str) -> Optional[str]:
+    """
+    Upload any media file to WhatsApp
+    
+    Supports: images, videos, audio, documents
+    Automatically detects MIME type from file extension
+    
+    Args:
+        file_path: Path to the media file
+        
+    Returns:
+        Media ID if successful, None otherwise
+        
+    Example:
+        >>> media_id = upload_media("/path/to/image.jpg")
+        >>> media_id = upload_media("/path/to/video.mp4")
+        >>> media_id = upload_media("/path/to/audio.mp3")
+    """
+    # Validate file exists
+    if not os.path.exists(file_path):
+        _logger.error("File not found: %s", file_path)
+        return None
+    
+    # Detect MIME type
+    mime_type = get_mime_type(file_path)
+    file_name = os.path.basename(file_path)
+    
+    _logger.info(f"Uploading file: {file_name} (MIME: {mime_type})")
+    
+    url = f"{API_BASE}/media"
+    headers = get_auth_header()
+    
+    # Open file for upload
+    file_handle = None
+    try:
+        file_handle = open(file_path, "rb")
+        
+        files = {
+            "file": (file_name, file_handle, mime_type)
+        }
+        
+        data = {
+            "messaging_product": "whatsapp"
+        }
+        
+        # Upload
+        response = requests.post(url, headers=headers, files=files, data=data)
+        _logger.info("Media upload response: %s", response.status_code)
+        
+        if response.ok:
+            response_data = response.json()
+            media_id = response_data.get("id")
+            _logger.info("Media uploaded successfully: %s (ID: %s)", file_name, media_id)
+            _logger.debug("Response JSON: %s", response_data)
+            return media_id
+        
+        # Handle error
+        _logger.error("Media upload failed. Status: %s", response.status_code)
+        try:
+            error_obj = response.json()
+            _logger.error("Error response: %s", json.dumps(error_obj, indent=2))
+            handle_error(error_obj)
+        except ValueError:
+            _logger.error("Response not valid JSON: %s", response.text)
+        
+        return None
+        
+    except requests.RequestException as e:
+        _logger.exception("Media upload request failed: %s", str(e))
+        return None
+        
+    except Exception as e:
+        _logger.exception("Unexpected error during upload: %s", str(e))
+        return None
+        
+    finally:
+        # Always close file handle
+        if file_handle:
+            file_handle.close()
+            _logger.debug("File handle closed for: %s", file_path)
+
+
+def upload_video(file_path: str) -> Optional[str]:
+    """
+    Upload a video file to WhatsApp (deprecated, use upload_media instead)
+    
+    Args:
+        file_path: Path to the video file
+        
+    Returns:
+        Media ID if successful, None otherwise
+    """
+    _logger.warning("upload_video() is deprecated, use upload_media() instead")
+    return upload_media(file_path)
+
+
+def send_media(media_type: str, user_ph: str, media_id: str, caption: str = "") -> dict:
+    """
+    Send media (audio, image, video) to a user
+    
+    Args:
+        media_type: Type of media ('audio', 'image', 'video')
+        user_ph: Recipient phone number
+        media_id: ID of the uploaded media
+        caption: Optional caption for image/video
+        
+    Returns:
+        Response data
+    """
+    url = f"{API_BASE}/messages"
+
+    media_dict = None
+
+    if media_type == "audio":
+        media_dict = {"id": media_id}
+    elif media_type in ["image", "video"]:
+        media_dict = {"id": media_id, "caption": caption}
+            
+    data = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": user_ph,
+        "type": media_type,
+        f"{media_type}": media_dict
+    }
+
+    try:
+        # _logger.info(f"DATA BEFORE SENDING! URL:{url}, HEADERS: {get_headers()}, DATA:{data}")
+        response = requests.post(url, headers=get_headers(), json=data)
+        _logger.info("Media send response for %s: %s", media_id, response.status_code)
+        
+        if response.ok:
+            _logger.info("Media %s sent successfully to %s", media_id, user_ph)
+            # _logger.debug("Response JSON: %s", response.json())
+            return response.json()
+        else:
+            _logger.error("Failed to send media %s. Status: %s", media_id, response.status_code)
+            try:
+                error_obj = response.json()
+                _logger.error("Error response: %s", json.dumps(error_obj, indent=2))
+                handle_error(error_obj)
+                return response.json()
+            except ValueError:
+                _logger.error("Response not valid JSON: %s", response.text)
+                return response.json()
+                
+    except requests.RequestException as e:
+        _logger.exception("Failed to send media %s: %s", media_id, str(e))
+        return response.json()
+
+
+def download_media(media_id: str, timestamp: Optional[datetime] = None, use_cache: bool = True) -> Optional[Dict]:
+    """
+    Download media file from WhatsApp with caching and retry logic
+    
+    Args:
+        media_id: ID of the media to download
+        timestamp: Optional message timestamp for expiration check
+        use_cache: Whether to use local cache (default: True)
+        
+    Returns:
+        Dict with 'content_type', 'data', and 'mime_type' if successful, None otherwise
+    """
+    from utility.media_cache_manager import get_media_cache
+    
+    cache = get_media_cache()
+    
+    # Increment total requests
+    cache._increment_stat("total_requests")
+    
+    # Check if media is in failed cache
+    if cache.is_media_failed(media_id):
+        _logger.warning(f"Media {media_id} is in failed cache, skipping download")
+        return None
+    
+    # Check if media is expired (older than 24 hours)
+    if timestamp and cache.is_media_expired(timestamp):
+        _logger.warning(f"Media {media_id} is expired (timestamp: {timestamp}), skipping download")
+        cache.mark_media_failed(media_id, "Media expired (>24 hours)")
+        return None
+    
+    # Check local cache first
+    if use_cache:
+        cached_media = cache.get_cached_media(media_id)
+        if cached_media:
+            _logger.info(f"Serving media {media_id} from local cache")
+            return cached_media
+    
+    # Download from API with retry logic
+    url = f"{BASE_URL}/{media_id}/"
+    headers = get_auth_header()
+    
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            _logger.info(f"GET {url} (attempt {attempt}/{MAX_RETRIES})")
+            cache._increment_stat("api_calls")
+            
+            response = requests.get(url, headers=headers, timeout=10)
+            _logger.info("Media URL fetch response for %s: %s", media_id, response.status_code)
+
+            if response.ok:
+                response_data = response.json()
+                _logger.info("Media URL received for %s", media_id)
+                _logger.debug("Response JSON: %s", response_data)
+
+                dl_url = response_data.get("url")
+                if not dl_url:
+                    _logger.error("No download URL in response for %s", media_id)
+                    cache.mark_media_failed(media_id, "No download URL in response")
+                    return None
+
+                _logger.info("Starting media download from %s", dl_url)
+                dl_resp = requests.get(dl_url, headers=headers, stream=True, timeout=30)
+
+                if dl_resp.ok:
+                    media_data = dl_resp.content
+                    mime_type = response_data.get("mime_type", "application/octet-stream")
+                    
+                    _logger.info(f"Media downloaded for {media_id} ({len(media_data)} bytes)")
+                    
+                    # Save to local cache
+                    if use_cache:
+                        cache.save_media_to_cache(media_id, media_data, mime_type)
+                    
+                    return {
+                        "content_type": dl_resp.headers.get("Content-Type"),
+                        "data": media_data,
+                        "mime_type": mime_type
+                    }
+                else:
+                    _logger.error("Failed to download media for %s. Status: %s", media_id, dl_resp.status_code)
+                    
+                    # If 404, mark as failed immediately (don't retry)
+                    if dl_resp.status_code == 404:
+                        _logger.warning(f"Media {media_id} not found (404), marking as failed")
+                        cache.mark_media_failed(media_id, f"404 Not Found")
+                        return None
+                    
+                    try:
+                        error_obj = dl_resp.json()
+                        _logger.error("Download error response: %s", json.dumps(error_obj, indent=2))
+                        handle_error(error_obj)
+                    except ValueError:
+                        _logger.error("Download response not valid JSON: %s", dl_resp.text)
+
+            # Outer API fetch failed
+            else:
+                _logger.error("Failed to fetch media URL for %s. Status: %s", media_id, response.status_code)
+                
+                # If 404, mark as failed immediately (don't retry)
+                if response.status_code == 404:
+                    _logger.warning(f"Media {media_id} not found (404), marking as failed")
+                    cache.mark_media_failed(media_id, f"404 Not Found")
+                    return None
+                
+                try:
+                    error_obj = response.json()
+                    _logger.error("Error response: %s", json.dumps(error_obj, indent=2))
+                    handle_error(error_obj)
+                except ValueError:
+                    _logger.error("Response not valid JSON: %s", response.text)
+            
+            # Retry logic with exponential backoff
+            if attempt < MAX_RETRIES:
+                backoff_time = BASE_BACKOFF_SECONDS ** attempt
+                _logger.info(f"Retrying media {media_id} in {backoff_time}s (attempt {attempt + 1}/{MAX_RETRIES})")
+                time.sleep(backoff_time)
+            else:
+                _logger.error(f"Max retries ({MAX_RETRIES}) reached for media {media_id}")
+                cache.mark_media_failed(media_id, f"Max retries reached")
+                return None
+
+        except requests.Timeout as e:
+            _logger.warning(f"Timeout fetching media {media_id} (attempt {attempt}/{MAX_RETRIES}): {e}")
+            if attempt < MAX_RETRIES:
+                backoff_time = BASE_BACKOFF_SECONDS ** attempt
+                time.sleep(backoff_time)
+            else:
+                cache.mark_media_failed(media_id, "Timeout after max retries")
+                return None
+                
+        except requests.RequestException as e:
+            _logger.exception("Media URL fetch request failed for %s (attempt %d/%d): %s", media_id, attempt, MAX_RETRIES, str(e))
+            if attempt < MAX_RETRIES:
+                backoff_time = BASE_BACKOFF_SECONDS ** attempt
+                time.sleep(backoff_time)
+            else:
+                cache.mark_media_failed(media_id, f"Request exception: {str(e)}")
+                return None
+        
+        except Exception as e:
+            _logger.exception("Unexpected error downloading media %s: %s", media_id, str(e))
+            cache.mark_media_failed(media_id, f"Unexpected error: {str(e)}")
+            return None
+    
+    return None
+
+
+def get_url(media_id: str, timestamp: Optional[datetime] = None) -> Optional[Dict]:
+    """
+    Get the download URL for a media file with caching support
+    
+    Args:
+        media_id: ID of the media
+        timestamp: Optional message timestamp for expiration check
+        
+    Returns:
+        Dict with 'url' key if successful, dict with 'error' key if failed
+    """
+    from utility.media_cache_manager import get_media_cache
+    
+    cache = get_media_cache()
+    
+    # Check if media is in failed cache
+    if cache.is_media_failed(media_id):
+        _logger.warning(f"Media {media_id} is in failed cache, skipping URL fetch")
+        return {"error": f"Media {media_id} is cached as failed"}
+    
+    # Check if media is expired (older than 24 hours)
+    if timestamp and cache.is_media_expired(timestamp):
+        _logger.warning(f"Media {media_id} is expired (timestamp: {timestamp}), skipping URL fetch")
+        cache.mark_media_failed(media_id, "Media expired (>24 hours)")
+        return {"error": f"Media {media_id} is expired"}
+    
+    url = f"{BASE_URL}/{media_id}/"
+    headers = get_auth_header()
+
+    try:
+        _logger.info(f"GET {url}")
+        response = requests.get(url, headers=headers, timeout=10)
+        _logger.info("Media URL fetch response for %s: %s", media_id, response.status_code)
+
+        if response.ok:
+            response_data = response.json()
+            _logger.info("Media URL received for %s", media_id)
+            _logger.debug("Response JSON: %s", response_data)
+
+            dl_url = response_data.get("url")
+                
+            if not dl_url:
+                _logger.error("No download URL in response for %s", media_id)
+                cache.mark_media_failed(media_id, "No download URL in response")
+                return {"error": f"No download URL in response for {media_id}"}
+            else:
+                return {"url": dl_url}
+        
+        # If 404, mark as failed
+        if response.status_code == 404:
+            _logger.warning(f"Media {media_id} not found (404), marking as failed")
+            cache.mark_media_failed(media_id, "404 Not Found")
+            return {"error": f"Media {media_id} not found (404)"}
+            
+        _logger.error("Failed to fetch media URL for %s. Status: %s", media_id, response.status_code)
+        try:
+            error_obj = response.json()
+            _logger.error("Error response: %s", json.dumps(error_obj, indent=2))
+            handle_error(error_obj)
+        except ValueError:
+            _logger.error("Response not valid JSON: %s", response.text)
+        return None
+
+    except requests.RequestException as e:
+        message = f"Media URL fetch request failed for {media_id}, {str(e)}"
+        _logger.exception(message)
+        return {"error": message}
