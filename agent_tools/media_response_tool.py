@@ -65,7 +65,7 @@ def send_media_tool(category: str, subcategory: str, user_ph: str, caption="") -
                 mime = resolve_mime(row["file_type"], row["file_extension"])
 
                 payload = {
-                    "conversation_id": conversation_id,
+                    "conversation_id": conversation_id, 
                     "direction": "outbound",
                     "sender_type": "ai",
                     "external_id": response['messages'][0]['id'],

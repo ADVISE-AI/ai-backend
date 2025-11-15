@@ -138,7 +138,7 @@ CATEGORIES WITHOUT SUBCATEGORIES
 
 - save the date  
 - welcome board  
-- wedding anniversary  
+- anniversary  
 - janoi  
 - muslim  
 - wardrobe  
@@ -147,7 +147,7 @@ CATEGORIES WITHOUT SUBCATEGORIES
 - baby shower  
 - mundan  
 - birthday  
-
+- utility
 
 ------------------------------------------------------------
 RULE SUMMARY (LLM MUST FOLLOW):
@@ -166,8 +166,8 @@ RULE SUMMARY (LLM MUST FOLLOW):
 
 5. Only use categories and subcategories EXACTLY as listed above.
     """
-    _logger.info(f"[MEDIA TOOL] Called with category='{category}', subcategory='{subcategory}', user_ph={user_ph}")
     user_ph = config.get("configurable", {}).get("thread_id")
+    _logger.info(f"[MEDIA TOOL] Called with category='{category}', subcategory='{subcategory}', user_ph={user_ph}")
     tool_response = send_media_tool(category=category, subcategory=subcategory, user_ph=user_ph)
     return tool_response
 
