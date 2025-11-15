@@ -44,7 +44,7 @@ def _initialize_db():
             pool_recycle=300,
             pool_timeout=30,
             connect_args={
-                "sslmode": "require",
+                # "sslmode": "require",
                 "connect_timeout": 10,
                 "keepalives": 1,
                 "keepalives_idle": 30,
@@ -62,7 +62,8 @@ def _initialize_db():
         _tables['user_conversation'] = _metadata.tables["user_conversation"]
         _tables['message'] = _metadata.tables["message"]
         _tables['conversation'] = _metadata.tables["conversation"]
-        _tables['sample_library'] = _metadata.tables["sample_media_library"]
+        _tables['media_files'] = _metadata.tables["media_files"]
+        _tables['categories'] = _metadata.tables['categories']
         
         _process_id = current_pid
         
@@ -81,7 +82,7 @@ def get_engine():
 
 
 def __getattr__(name):
-    if name in ('engine', 'user', 'user_conversation', 'message', 'conversation', 'sample_library'):
+    if name in ('engine', 'user', 'user_conversation', 'message', 'conversation', 'media_files', 'categories'):
         if _engine is None or _process_id != os.getpid():
             with _init_lock:
                 # Double-check pattern

@@ -53,8 +53,7 @@ def get_checkpointer():
             pass
         _langgraph_conn = None
         _checkpointer = None
-    
-    # Check 2: Connection exists but is dead/closed
+
     elif _langgraph_conn is not None and not is_connection_alive(_langgraph_conn):
         _logger.warning(f"LangGraph: Dead connection detected for PID {current_pid}, recreating...")
         try:
@@ -64,14 +63,12 @@ def get_checkpointer():
         _langgraph_conn = None
         _checkpointer = None
     
-    # Create new connection if needed
     if _checkpointer is None:
         _logger.info(f"Creating LangGraph checkpointer for PID {current_pid}")
         
-        # Proper SSL and connection configuration
         conn_params = make_conninfo(
             f"postgresql://{DB_URL}",
-            sslmode='require',
+            # sslmode='require',
             connect_timeout=10,
             keepalives=1,
             keepalives_idle=30,
@@ -86,7 +83,6 @@ def get_checkpointer():
             prepare_threshold=0,
         )
         
-        # Test connection immediately
         try:
             _langgraph_conn.execute("SELECT 1").fetchone()
             _logger.info("LangGraph connection test successful")
@@ -97,7 +93,6 @@ def get_checkpointer():
         
         _checkpointer = PostgresSaver(_langgraph_conn)
         
-        # Setup tables (idempotent)
         try:
             _checkpointer.setup()
             _logger.info("LangGraph DB setup successful")
@@ -291,7 +286,7 @@ def stream_graph_updates(user_ph: str, user_input: dict) -> dict:
         
     except Exception as e:
         _logger.error(f"Graph streaming error: {e}", exc_info=True)
-        final_response = {"content": "Sorry, I encountered an error.", "metadata": None}
+        final_response = {"content": "", "metadata": None}
     
     _logger.info(f"Final response after {turn_count} turns: {final_response}")
     return final_response

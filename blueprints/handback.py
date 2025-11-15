@@ -22,7 +22,6 @@ def handback_to_ai():
         
         try:
             with engine.begin() as conn:
-                # Clear intervention flag in DB
                 conn.execute(
                     update(conversation)
                     .where(conversation.c.phone == str(phone))
