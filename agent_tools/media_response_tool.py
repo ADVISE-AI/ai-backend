@@ -74,8 +74,7 @@ def send_media_tool(category: str, subcategory: str, user_ph: str, caption="") -
                     "media_info": json.dumps({
                         "id": wa_id,
                         "mime_type": mime,
-                        "category": category,
-                        "subcategory": subcategory or None,
+                        "description": "NO DESCRIPTION"
                     }),
                     "status": "pending",
                     "provider_ts": datetime.utcnow().isoformat(),
