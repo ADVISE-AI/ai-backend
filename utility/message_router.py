@@ -4,16 +4,6 @@ from sqlalchemy import select, insert
 from .store_message import store_user_message
 from .handle_with_ai import handle_with_ai
 
-
-_logger = logger(__name__)
-
-from config import logger
-from db import engine, conversation
-from sqlalchemy import select, insert
-from .store_message import store_user_message
-from .handle_with_ai import handle_with_ai
-
-
 _logger = logger(__name__)
 
 def message_router(normalized_data: dict):
