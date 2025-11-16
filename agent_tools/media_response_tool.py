@@ -72,7 +72,7 @@ def send_media_tool(category: str, subcategory: str, user_ph: str, caption="") -
                     "has_text": True if caption else False,
                     "message_text": caption if caption else None,
                     "media_info": json.dumps({
-                        "wa_media_id": wa_id,
+                        "media_id": wa_id,
                         "mime_type": mime,
                         "category": category,
                         "subcategory": subcategory or None,
