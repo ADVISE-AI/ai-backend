@@ -1,14 +1,11 @@
 from flask import Blueprint, request, jsonify
 from config import logger, BACKEND_BASE_URL
 from utility import store_operator_message
-from utility.whatsapp import send_message, upload_media, send_media, typing_indicator
-from typing import Tuple, Optional, Dict
+from utility.whatsapp import send_message, typing_indicator
+from typing import Tuple
 from db import engine, conversation, message
 from sqlalchemy import select
 from sqlalchemy.exc import OperationalError, DBAPIError
-import tempfile
-import requests
-import os
 import json
 import time
 
@@ -39,17 +36,28 @@ def get_media_type_and_extension(mime_type: str) -> Tuple[str, str]:
     return mime_mapping.get(mime_type.lower(), ("document", ".bin"))
 
 
-def download_operator_media(file_id: str, mime_type: str) -> Optional[Dict]:
+def download_operator_media(file_id: str, mime_type: str):
+    """
+    Download media from interface backend
+    
+    IMPORTANT: This function can take 30+ seconds for large files.
+    It should ONLY be called from Celery workers with proper timeouts.
+    """
+    import requests
+    import tempfile
+    import os
+    
     download_url = f"{BACKEND_BASE_URL}api/v1/get-sent-media"
     
     try:
         _logger.info(f"Downloading media: fileId={file_id}, mimeType={mime_type}")
         
+        # Add streaming timeout (separate from Gunicorn timeout)
         response = requests.get(
             download_url,
             params={"fileId": file_id, "type": mime_type},
             stream=True,
-            timeout=30
+            timeout=(10, 120)  # (connect_timeout, read_timeout) = 10s connect, 120s read
         )
         
         if not response.ok:
@@ -64,9 +72,16 @@ def download_operator_media(file_id: str, mime_type: str) -> Optional[Dict]:
             prefix=f"operator_media_{file_id}_"
         )
         
+        # Download with progress logging
+        bytes_downloaded = 0
         for chunk in response.iter_content(chunk_size=8192):
             if chunk:
                 temp_file.write(chunk)
+                bytes_downloaded += len(chunk)
+                
+                # Log progress every 1MB
+                if bytes_downloaded % (1024 * 1024) == 0:
+                    _logger.info(f"Downloaded {bytes_downloaded / (1024*1024):.1f}MB...")
         
         temp_file.close()
         file_path = temp_file.name
@@ -95,18 +110,13 @@ def download_operator_media(file_id: str, mime_type: str) -> Optional[Dict]:
 
 
 def store_operator_message_with_retry(message_text: str, phone: str, message_id: str = None, **kwargs):
-    """
-    Store operator message with automatic retry on connection errors
-    
-    IMPORTANT: This already uses async Celery task for graph sync via store_operator_message()
-    """
+    """Store operator message with automatic retry on connection errors"""
     max_retries = 3
     
     for attempt in range(max_retries):
         try:
-            # This internally queues sync_operator_message_to_graph_task via Celery
             store_operator_message(message_text, phone, message_id, **kwargs)
-            return  # Success!
+            return
             
         except (OperationalError, DBAPIError) as e:
             error_msg = str(e).lower()
@@ -122,17 +132,17 @@ def store_operator_message_with_retry(message_text: str, phone: str, message_id:
                 time.sleep(backoff)
                 continue
             
-            # Not a connection error or out of retries
             _logger.error(f"Failed to store operator message after {attempt + 1} attempts")
             raise
    
+
 @operator_bp.route("/operatormsg", methods=["GET","POST"])
 def operatormsg():
     """
-    Handle operator messages with full context sync
+    Handle operator messages
     
-    CRITICAL FIX: Graph sync now happens asynchronously via Celery task
-    in store_operator_message() → sync_operator_message_to_graph_task
+    CRITICAL FIX: Media processing now happens asynchronously via Celery
+    to prevent Gunicorn worker timeouts on slow downloads.
     """
     if request.method == "POST":
         data = request.get_json(force=True)
@@ -155,58 +165,44 @@ def operatormsg():
         mime_type = data.get("mimeType", None)
 
         if media and mime_type:
-            # Handle media message
-            downloaded_content = download_operator_media(media, mime_type)
-
-            if downloaded_content["success"]:
-                file_path = downloaded_content["file_path"]
-                media_type = downloaded_content["media_type"]
-
-                try:
-                    # Upload media to WhatsApp
-                    media_id = upload_media(file_path)
-                    if not media_id:
-                        raise Exception("Media upload failed, no media ID returned")
-                    
-                    # Send media message
-                    response = send_media(media_type, phone, media_id, message)
-                    message_id = response.get("messages", [{}])[0].get('id') if response else None
-
-                    # CRITICAL FIX: This now uses async Celery task internally
-                    # store_operator_message() → sync_operator_message_to_graph_task.apply_async()
-                    store_operator_message_with_retry(
-                        message, phone, message_id, 
-                        media_id=media_id, 
-                        mime_type=mime_type, 
-                        sender_id=sender_id
-                    )
-                    
-                    _logger.info(f"Operator media message queued for graph sync: {phone}")
-                    
-                    return jsonify({"status": "success", "message_id": message_id})
-
-                except Exception as e:
-                    _logger.error(f"Failed to send operator media message: {e}")
-                    return jsonify({"status": "error", "error": str(e)}), 500
-
-                finally:
-                    # Clean up temporary file
-                    if os.path.exists(file_path):
-                        os.remove(file_path)
-                        _logger.info(f"Temporary file {file_path} deleted")
+            # CRITICAL FIX: Offload media processing to Celery
+            # This prevents blocking the Gunicorn worker on slow downloads
+            from tasks import process_operator_media_task
+            
+            try:
+                # Queue the media processing task
+                task = process_operator_media_task.apply_async(
+                    args=[phone, media, mime_type, message, sender_id],
+                    queue='media',
+                    priority=6  # High priority for operator actions
+                )
+                
+                _logger.info(f"Queued media processing task {task.id[:8]} for {phone}")
+                
+                # Return immediately (don't wait for Celery task)
+                return jsonify({
+                    "status": "accepted",
+                    "message": "Media message queued for processing",
+                    "task_id": task.id
+                }), 202  # 202 Accepted
+                
+            except Exception as e:
+                _logger.error(f"Failed to queue media processing: {e}")
+                return jsonify({"status": "error", "error": str(e)}), 500
                         
         else:
-            # Handle text message    
+            # Handle text message (keep synchronous - it's fast)
             try:
+                from utility.whatsapp import send_message
+                
                 # Send to WhatsApp
                 response = send_message(phone, message)
                 message_id = response.get("messages", [{}])[0].get('id') if response else None
 
-                # CRITICAL FIX: This now uses async Celery task internally
-                # Graph sync happens via sync_operator_message_to_graph_task in background
+                # Store in DB (async graph sync via Celery)
                 store_operator_message_with_retry(message, phone, message_id, sender_id=sender_id)
                 
-                _logger.info(f"Operator text message queued for graph sync: {phone}")
+                _logger.info(f"Operator text message sent to {phone}")
 
                 return jsonify({"status": "success", "message_id": message_id}), 200
 

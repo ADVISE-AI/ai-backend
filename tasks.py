@@ -283,6 +283,83 @@ def update_message_status_task(status_data: dict):
         _logger.error(f"Status update failed: {e}", exc_info=True)
         return {"status": "failed", "error": str(e)}
 
+@celery_app.task(
+    name='tasks.process_operator_media',
+    bind=True,
+    max_retries=3,
+    default_retry_delay=10,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    time_limit=180,  # 3 minutes hard limit
+    soft_time_limit=150  # 2.5 minutes soft limit
+)
+def process_operator_media_task(self, phone: str, media_file_id: str, mime_type: str, 
+                                message_text: str, sender_id: str):
+    """
+    Download media from backend, upload to WhatsApp, and store message
+    
+    Args:
+        phone: Recipient phone number
+        media_file_id: File ID from the interface backend
+        mime_type: MIME type of the media
+        message_text: Caption/message text
+        sender_id: Operator user ID
+    
+    Returns:
+        dict: Status and message_id
+    """
+    from blueprints.operatormsg import download_operator_media, get_media_type_and_extension
+    from utility.whatsapp import upload_media, send_media
+    from utility.store_message import store_operator_message
+    import os
+    
+    try:
+        _logger.info(f"[Celery-{self.request.id[:8]}] Processing operator media for {phone}")
+        
+        # Download media from interface backend
+        downloaded_content = download_operator_media(media_file_id, mime_type)
+        
+        if not downloaded_content.get("success"):
+            raise Exception(f"Media download failed: {downloaded_content.get('error')}")
+        
+        file_path = downloaded_content["file_path"]
+        media_type = downloaded_content["media_type"]
+        
+        try:
+            # Upload to WhatsApp
+            media_id = upload_media(file_path)
+            if not media_id:
+                raise Exception("WhatsApp media upload failed")
+            
+            # Send to user
+            response = send_media(media_type, phone, media_id, message_text)
+            message_id = response.get("messages", [{}])[0].get('id') if response else None
+            
+            # Store in database
+            store_operator_message(
+                message_text, phone, message_id,
+                media_id=media_id,
+                mime_type=mime_type,
+                sender_id=sender_id
+            )
+            
+            _logger.info(f"[Celery-{self.request.id[:8]}] Operator media sent successfully")
+            return {
+                "status": "success",
+                "message_id": message_id,
+                "phone": phone
+            }
+            
+        finally:
+            # Clean up temp file
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                _logger.info(f"Cleaned up temp file: {file_path}")
+                
+    except Exception as e:
+        _logger.error(f"[Celery-{self.request.id[:8]}] Operator media processing failed: {e}", 
+                     exc_info=True)
+        raise
 
 # Task routing
 celery_app.conf.task_routes = {
@@ -295,13 +372,17 @@ celery_app.conf.task_routes = {
         'routing_key': 'message.status',
     },
     'tasks.update_langgraph_state': {
-        'queue': 'state',  # NEW: Dedicated queue for state updates
+        'queue': 'state',  
         'routing_key': 'state.update',
     },
     'tasks.sync_operator_message_to_graph': {
         'queue': 'state',
         'routing_key': 'state.sync',
     },
+    'tasks.process_operator_media': {
+        'queue': 'media', #New task to process operator end uploaded media
+        'routing_key': 'media.process',
+    }
 }
 
 
