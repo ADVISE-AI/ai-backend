@@ -18,7 +18,7 @@ from utility.content_block import content_formatter
 
 from psycopg import Connection
 from psycopg.conninfo import make_conninfo
-
+import time 
 import os
 import threading
 
@@ -144,33 +144,115 @@ class State(TypedDict):
 
 
 @tool("RespondWithMedia")
-def RespondWithMedia(media_description: str, *, config: RunnableConfig) -> dict:
+def RespondWithMedia(category: str, subcategory: str = "", *, config: RunnableConfig) -> dict:
     """
-    Send the user WhatsApp media based on file type.
-    
-    Args:
-        media_description: Choose one of 'ai', '3d', '2d', 'info', 'customer_review', 
-                          'intro', 'bride_groom_sample'.
-    
-    Extra notes for the LLM:
-        - 'ai', '3d', '2d' are videos
-        - 'intro' is an image with introduction about Joy Invite
-        - 'info' is an audio with ordering procedure information
-        - 'customer_review' is an image with customer testimonial
-        - 'bride_groom_sample' is an image with sample bride/groom picture
-    
-    Returns:
-        dict: Tool execution result with status
+    Send WhatsApp media from the Joy Invite sample library.
+
+    VALID ARGUMENTS (LLM MUST FOLLOW EXACTLY):
+
+    CATEGORIES WITH SUBCATEGORIES  (MUST pass BOTH category and subcategory)
+    ----------------------------------------------------------------------
+    - category="south_india"   subcategory ∈ {"2d", "3d", "ai"}
+    - category="north_india"   subcategory ∈ {"2d", "3d", "ai"}
+    - category="punjabi"       subcategory ∈ {"2d", "3d"}
+    - category="engagement"    subcategory ∈ {"2d", "3d"}
+
+    CATEGORIES WITHOUT SUBCATEGORIES (MUST pass subcategory="")
+    -----------------------------------------------------------
+    - "save_the_date"
+    - "welcome_board"
+    - "anniversary"
+    - "janoi"
+    - "muslim"
+    - "wardrobe"
+    - "story"
+    - "house_warming"
+    - "baby_shower"
+    - "mundan"
+    - "birthday"
+    - "utility"
+
+    RULES:
+    - Use ONLY the category and subcategory values listed above.
+    - Always use lowercase and underscores, e.g. "south_india", "save_the_date".
+    - Do NOT invent new categories or subcategories.
+    - If user asks for a style that maps clearly to one of these, choose the closest valid category/subcategory.
     """
     user_ph = config.get("configurable", {}).get("thread_id")
-    
     if not user_ph:
-        _logger.error("Missing thread_id in RespondWithMedia tool call")
+        _logger.error("RespondWithMedia called without thread_id")
         return {"status": "error", "message": "Missing user phone number"}
-    
+
+    # Normalization
+    raw_category = category or ""
+    raw_subcat = subcategory or ""
+    norm_category = raw_category.strip().lower().replace(" ", "_").replace("-", "_")
+    norm_subcat = raw_subcat.strip().lower()
+
+    CATS_WITH_SUB = {
+        "south_india": {"2d", "3d", "ai"},
+        "north_india": {"2d", "3d", "ai"},
+        "punjabi": {"2d", "3d"},
+        "engagement": {"2d", "3d"},
+    }
+
+    CATS_NO_SUB = {
+        "save_the_date",
+        "welcome_board",
+        "anniversary",
+        "janoi",
+        "muslim",
+        "wardrobe",
+        "story",
+        "house_warming",
+        "baby_shower",
+        "mundan",
+        "birthday",
+        "utility",
+    }
+
+    # Validation
+    if norm_category in CATS_WITH_SUB:
+        if norm_subcat not in CATS_WITH_SUB[norm_category]:
+            _logger.error(
+                f"Invalid subcategory '{norm_subcat}' for category '{norm_category}'. "
+                f"Valid: {sorted(CATS_WITH_SUB[norm_category])}"
+            )
+            return {
+                "status": "error",
+                "message": (
+                    f"Invalid subcategory '{raw_subcat}' for '{raw_category}'. "
+                    f"Valid options: {sorted(CATS_WITH_SUB[norm_category])}"
+                ),
+            }
+    elif norm_category in CATS_NO_SUB:
+        if norm_subcat:
+            _logger.error(
+                f"Category '{norm_category}' does not support subcategories; got '{norm_subcat}'"
+            )
+            return {
+                "status": "error",
+                "message": f"Category '{raw_category}' does not have subcategories.",
+            }
+    else:
+        _logger.error(f"Unknown media category '{norm_category}' (raw='{raw_category}')")
+        return {
+            "status": "error",
+            "message": f"Unknown media category '{raw_category}'.",
+        }
+
+    _logger.info(
+        f"[MEDIA TOOL] Normalized call: category='{norm_category}', "
+        f"subcategory='{norm_subcat}', user_ph={user_ph}"
+    )
+
     try:
-        tool_response = send_media_tool(media_description=media_description, user_ph=user_ph)
-        return tool_response
+        tool_response = send_media_tool(
+            category=norm_category,
+            subcategory=norm_subcat,
+            user_ph=user_ph,
+        )
+        return {"status": "success", "data": tool_response}
     except Exception as e:
         _logger.error(f"RespondWithMedia tool failed: {e}", exc_info=True)
         return {"status": "error", "message": str(e)}
@@ -273,7 +355,7 @@ def gemini_node(state: State):
             "system_message": GEMINI_SYSTEM_PROMPT,
             "messages": state['messages']
         })
-        
+        _logger.info(f"Gemini raw response: {repr(ai_resp)}")  # <-- add this
         return {"messages": [ai_resp]}
     
     except Exception as e:
@@ -371,7 +453,6 @@ def stream_graph_updates(user_ph: str, user_input: dict) -> dict:
     
     try:
         # Step 1: Format content
-        import time
         t0 = time.time()
         content = content_formatter(user_input)
         t1 = time.time()

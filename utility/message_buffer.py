@@ -313,6 +313,6 @@ def get_message_buffer() -> Message_Buffer:
     global _message_buffer_instance 
     if _message_buffer_instance is None:
         # Use 2 seconds to match webhook countdown
-        _message_buffer_instance = Message_Buffer(debounce_time=2.0, max_wait_time=20.0)
+        _message_buffer_instance = Message_Buffer(debounce_time=0.5, max_wait_time=10.0)
         _logger.info("Created new message buffer instance")
     return _message_buffer_instance
