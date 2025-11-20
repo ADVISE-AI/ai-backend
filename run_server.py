@@ -41,7 +41,7 @@ def main():
     # Uvicorn configuration
     config = {
         "app": "app:app",
-        "host": "0.0.0.0",
+        "host": "127.0.0.1",
         "port": 5000,
         "workers": workers,
         "log_level": os.getenv("LOG_LEVEL", "info"),

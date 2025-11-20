@@ -44,7 +44,7 @@ def _initialize_db():
             pool_recycle=300,
             pool_timeout=30,
             connect_args={
-                "sslmode": "require",
+                # "sslmode": "require",
                 "connect_timeout": 10,
                 "keepalives": 1,
                 "keepalives_idle": 30,

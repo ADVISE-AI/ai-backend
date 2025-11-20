@@ -47,7 +47,7 @@ def send_message(to: str, message: str) -> Optional[dict]:
             _logger.debug("Response JSON: %s", resp_data)
             return resp_data
         else:
-            _logger.error("Failed to send message. Status: %s", response.status_code)
+            _logger.error("Failed to send message. Status: %s", response.status_code,f"\n Payload: {json.dumps(data, indent=2)}")
             _logger.error("Error response: %s", json.dumps(resp_data, indent=2))
             return resp_data
 
