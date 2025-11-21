@@ -97,7 +97,7 @@ def get_checkpointer():
                 # Proper SSL and connection configuration
                 conn_params = make_conninfo(
                     f"postgresql://{DB_URL}",
-                    # sslmode='require',
+                    sslmode='require',
                     connect_timeout=10,
                     keepalives=1,
                     keepalives_idle=30,
@@ -488,7 +488,7 @@ def stream_graph_updates(user_ph: str, user_input: dict) -> dict:
                     
                     # Extract content
                     if hasattr(last_message, "content") and last_message.content:
-                        final_response["content"] = last_message.content
+                        final_response["content"] = dict(last_message.content[0]).get('text')
                     
                     # Extract metadata
                     if hasattr(last_message, "usage_metadata"):
@@ -526,7 +526,7 @@ def stream_graph_updates(user_ph: str, user_input: dict) -> dict:
             "metadata": None
         }
     
-    _logger.info(f"Final response for {user_ph} after {turn_count} turns: {len(final_response['content'])} chars\nResponse: {final_response['content'][:100]}...")
+    _logger.info(f"Final response for {user_ph} after {turn_count} turns: {len(final_response['content'])} chars\nResponse: {final_response['content']}")
     return final_response
 
 
