@@ -1,0 +1,257 @@
+INFO:     Will watch for changes in these directories: ['/home/darkus/Desktop/AdviseProject/ai-backend']
+INFO:     Uvicorn running on http://127.0.0.1:5000 (Press CTRL+C to quit)
+INFO:     Started reloader process [18117] using StatReload
+⚙️  Running without SSL (Development mode)
+🔄 Auto-reload enabled (Development mode)
+============================================================
+🚀 Environment: development
+Workers:      1
+SSL:          ❌ Disabled
+============================================================
+2025-11-21T10:31:18,399 INFO     [db.py:36] Initializing database for PID 18120
+2025-11-21T10:31:18,717 INFO     [db.py:80] ✅ Database initialized for PID 18120 (pool_size=5, max_overflow=10)
+2025-11-21T10:31:20,605 INFO     [bot.py:314] Gemini system prompt loaded successfully
+2025-11-21T10:31:22,236 INFO     [bot.py:327] Gemini model initialized successfully
+2025-11-21T10:31:22,242 INFO     [bot.py:414] LangGraph graph built successfully
+2025-11-21T10:31:22,242 INFO     [bot.py:534] bot.py module loaded successfully
+2025-11-21T10:31:22,243 INFO     [message_deduplicator.py:15] Connecting to Redis at localhost:6379
+2025-11-21T10:31:22,253 INFO     [message_deduplicator.py:18] ✅ Redis connection established
+2025-11-21T10:31:22,562 INFO     [message_buffer.py:29] Message buffer Redis connection established
+2025-11-21T10:31:22,563 INFO     [message_buffer.py:317] Created new message buffer instance
+2025-11-21T10:31:22,657 INFO     [app.py:140] ✅ All routers registered
+INFO:     Started server process [18120]
+INFO:     Waiting for application startup.
+2025-11-21T10:31:22,660 INFO     [app.py:36] 🚀 Starting WhatsApp AI Backend...
+2025-11-21T10:31:22,662 INFO     [app.py:43] ✅ Database connection verified
+2025-11-21T10:31:22,670 INFO     [app.py:53] ✅ Redis connection verified
+2025-11-21T10:31:22,670 INFO     [app.py:58] ✅ All systems operational
+INFO:     Application startup complete.
+2025-11-21T10:31:37,791 INFO     [app.py:110] → POST /webhook from 2a03:2880:12ff:42::
+2025-11-21T10:31:37,793 INFO     [webhook.py:72] RECEIVED WHATSAPP WEBHOOK DATA: {
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "1124430582490621",
+      "changes": [
+        {
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "15551373346",
+              "phone_number_id": "742452155624690"
+            },
+            "contacts": [
+              {
+                "profile": {
+                  "name": "Ayush"
+                },
+                "wa_id": "917980977361"
+              }
+            ],
+            "messages": [
+              {
+                "from": "917980977361",
+                "id": "wamid.HBgMOTE3OTgwOTc3MzYxFQIAEhgWM0VCMEM0MEQwMUY2QjJBREJEQ0NFNAA=",
+                "timestamp": "1763701296",
+                "text": {
+                  "body": "okay let me see"
+                },
+                "type": "text"
+              }
+            ]
+          },
+          "field": "messages"
+        }
+      ]
+    }
+  ]
+}
+2025-11-21T10:31:37,795 INFO     [message_buffer.py:108] Started message buffer for 917980977361
+2025-11-21T10:31:37,795 INFO     [webhook.py:119] Scheduling buffer check for 917980977361 in 2 seconds
+2025-11-21T10:31:37,816 DEBUG    [functional.py:335] 
+def check_buffer_task(phone):
+    return 1
+
+2025-11-21T10:31:37,910 INFO     [app.py:118] ← 200 for /webhook
+INFO:     2a03:2880:12ff:42:::0 - "POST /webhook HTTP/1.1" 200 OK
+2025-11-21T10:31:51,390 INFO     [app.py:110] → POST /webhook from 2a03:2880:12ff:47::
+2025-11-21T10:31:51,391 INFO     [webhook.py:72] RECEIVED WHATSAPP WEBHOOK DATA: {
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "1124430582490621",
+      "changes": [
+        {
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "15551373346",
+              "phone_number_id": "742452155624690"
+            },
+            "statuses": [
+              {
+                "id": "wamid.HBgMOTE3OTgwOTc3MzYxFQIAERgSQjIxQzhDNzI2Q0UwNThERTdFAA==",
+                "status": "sent",
+                "timestamp": "1763701310",
+                "recipient_id": "917980977361",
+                "pricing": {
+                  "billable": false,
+                  "pricing_model": "PMP",
+                  "category": "service",
+                  "type": "free_customer_service"
+                }
+              }
+            ]
+          },
+          "field": "messages"
+        }
+      ]
+    }
+  ]
+}
+2025-11-21T10:31:51,391 INFO     [webhook.py:141] Message status update received: ID=wamid.HBgMOTE3OTgwOTc3MzYxFQIAERgSQjIxQzhDNzI2Q0UwNThERTdFAA==, Status=sent
+2025-11-21T10:31:51,392 DEBUG    [functional.py:335] 
+def update_message_status_task(status_data):
+    return 1
+
+2025-11-21T10:31:51,399 INFO     [webhook.py:150] Status update task queued for message wamid.HBgMOTE3OTgwOTc3MzYxFQIAERgSQjIxQzhDNzI2Q0UwNThERTdFAA==
+2025-11-21T10:31:51,399 INFO     [app.py:118] ← 200 for /webhook
+INFO:     2a03:2880:12ff:47:::0 - "POST /webhook HTTP/1.1" 200 OK
+2025-11-21T10:31:51,902 INFO     [app.py:110] → POST /webhook from 2a03:2880:10ff:42::
+2025-11-21T10:31:51,918 INFO     [webhook.py:72] RECEIVED WHATSAPP WEBHOOK DATA: {
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "1124430582490621",
+      "changes": [
+        {
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "15551373346",
+              "phone_number_id": "742452155624690"
+            },
+            "statuses": [
+              {
+                "id": "wamid.HBgMOTE3OTgwOTc3MzYxFQIAERgSQjIxQzhDNzI2Q0UwNThERTdFAA==",
+                "status": "delivered",
+                "timestamp": "1763701310",
+                "recipient_id": "917980977361",
+                "pricing": {
+                  "billable": false,
+                  "pricing_model": "PMP",
+                  "category": "service",
+                  "type": "free_customer_service"
+                }
+              }
+            ]
+          },
+          "field": "messages"
+        }
+      ]
+    }
+  ]
+}
+2025-11-21T10:31:51,918 INFO     [webhook.py:141] Message status update received: ID=wamid.HBgMOTE3OTgwOTc3MzYxFQIAERgSQjIxQzhDNzI2Q0UwNThERTdFAA==, Status=delivered
+2025-11-21T10:31:51,939 INFO     [webhook.py:150] Status update task queued for message wamid.HBgMOTE3OTgwOTc3MzYxFQIAERgSQjIxQzhDNzI2Q0UwNThERTdFAA==
+2025-11-21T10:31:51,939 INFO     [app.py:118] ← 200 for /webhook
+INFO:     2a03:2880:10ff:42:::0 - "POST /webhook HTTP/1.1" 200 OK
+2025-11-21T10:31:57,509 INFO     [app.py:110] → POST /webhook from 2a03:2880:10ff:4e::
+2025-11-21T10:31:57,511 INFO     [webhook.py:72] RECEIVED WHATSAPP WEBHOOK DATA: {
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "1124430582490621",
+      "changes": [
+        {
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "15551373346",
+              "phone_number_id": "742452155624690"
+            },
+            "statuses": [
+              {
+                "id": "wamid.HBgMOTE3OTgwOTc3MzYxFQIAERgSQjIxQzhDNzI2Q0UwNThERTdFAA==",
+                "status": "read",
+                "timestamp": "1763701316",
+                "recipient_id": "917980977361",
+                "pricing": {
+                  "billable": false,
+                  "pricing_model": "PMP",
+                  "category": "service",
+                  "type": "free_customer_service"
+                }
+              }
+            ]
+          },
+          "field": "messages"
+        }
+      ]
+    }
+  ]
+}
+2025-11-21T10:31:57,512 INFO     [webhook.py:141] Message status update received: ID=wamid.HBgMOTE3OTgwOTc3MzYxFQIAERgSQjIxQzhDNzI2Q0UwNThERTdFAA==, Status=read
+2025-11-21T10:31:57,515 INFO     [webhook.py:150] Status update task queued for message wamid.HBgMOTE3OTgwOTc3MzYxFQIAERgSQjIxQzhDNzI2Q0UwNThERTdFAA==
+2025-11-21T10:31:57,516 INFO     [app.py:118] ← 200 for /webhook
+INFO:     2a03:2880:10ff:4e:::0 - "POST /webhook HTTP/1.1" 200 OK
+WARNING:  StatReload detected changes in 'bot.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2025-11-21T10:32:41,265 INFO     [app.py:63] 🛑 Shutting down WhatsApp AI Backend...
+2025-11-21T10:32:41,271 INFO     [app.py:68] ✅ Database connections closed
+2025-11-21T10:32:41,271 INFO     [app.py:72] 👋 Shutdown complete
+INFO:     Application shutdown complete.
+INFO:     Finished server process [18120]
+2025-11-21T10:32:46,467 INFO     [db.py:36] Initializing database for PID 18937
+2025-11-21T10:32:46,747 INFO     [db.py:80] ✅ Database initialized for PID 18937 (pool_size=5, max_overflow=10)
+2025-11-21T10:32:48,870 INFO     [bot.py:314] Gemini system prompt loaded successfully
+2025-11-21T10:32:50,286 INFO     [bot.py:327] Gemini model initialized successfully
+2025-11-21T10:32:50,289 INFO     [bot.py:414] LangGraph graph built successfully
+2025-11-21T10:32:50,289 INFO     [bot.py:534] bot.py module loaded successfully
+2025-11-21T10:32:50,290 INFO     [message_deduplicator.py:15] Connecting to Redis at localhost:6379
+2025-11-21T10:32:50,292 INFO     [message_deduplicator.py:18] ✅ Redis connection established
+2025-11-21T10:32:50,487 INFO     [message_buffer.py:29] Message buffer Redis connection established
+2025-11-21T10:32:50,488 INFO     [message_buffer.py:317] Created new message buffer instance
+2025-11-21T10:32:50,522 INFO     [app.py:140] ✅ All routers registered
+INFO:     Started server process [18937]
+INFO:     Waiting for application startup.
+2025-11-21T10:32:50,524 INFO     [app.py:36] 🚀 Starting WhatsApp AI Backend...
+2025-11-21T10:32:50,525 INFO     [app.py:43] ✅ Database connection verified
+2025-11-21T10:32:50,528 INFO     [app.py:53] ✅ Redis connection verified
+2025-11-21T10:32:50,528 INFO     [app.py:58] ✅ All systems operational
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'bot.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2025-11-21T10:36:16,141 INFO     [app.py:63] 🛑 Shutting down WhatsApp AI Backend...
+2025-11-21T10:36:16,146 INFO     [app.py:68] ✅ Database connections closed
+2025-11-21T10:36:16,146 INFO     [app.py:72] 👋 Shutdown complete
+INFO:     Application shutdown complete.
+INFO:     Finished server process [18937]
+2025-11-21T10:36:17,755 INFO     [db.py:36] Initializing database for PID 20458
+2025-11-21T10:36:18,005 INFO     [db.py:80] ✅ Database initialized for PID 20458 (pool_size=5, max_overflow=10)
+2025-11-21T10:36:18,991 INFO     [bot.py:314] Gemini system prompt loaded successfully
+2025-11-21T10:36:19,899 INFO     [bot.py:327] Gemini model initialized successfully
+2025-11-21T10:36:19,903 INFO     [bot.py:414] LangGraph graph built successfully
+2025-11-21T10:36:19,903 INFO     [bot.py:534] bot.py module loaded successfully
+2025-11-21T10:36:19,905 INFO     [message_deduplicator.py:15] Connecting to Redis at localhost:6379
+2025-11-21T10:36:19,909 INFO     [message_deduplicator.py:18] ✅ Redis connection established
+2025-11-21T10:36:20,033 INFO     [message_buffer.py:29] Message buffer Redis connection established
+2025-11-21T10:36:20,033 INFO     [message_buffer.py:317] Created new message buffer instance
+2025-11-21T10:36:20,074 INFO     [app.py:140] ✅ All routers registered
+INFO:     Started server process [20458]
+INFO:     Waiting for application startup.
+2025-11-21T10:36:20,075 INFO     [app.py:36] 🚀 Starting WhatsApp AI Backend...
+2025-11-21T10:36:20,076 INFO     [app.py:43] ✅ Database connection verified
+2025-11-21T10:36:20,080 INFO     [app.py:53] ✅ Redis connection verified
+2025-11-21T10:36:20,080 INFO     [app.py:58] ✅ All systems operational
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2025-11-21T10:36:38,172 INFO     [app.py:63] 🛑 Shutting down WhatsApp AI Backend...
+2025-11-21T10:36:38,173 INFO     [app.py:68] ✅ Database connections closed
+2025-11-21T10:36:38,173 INFO     [app.py:72] 👋 Shutdown complete
+INFO:     Application shutdown complete.
+INFO:     Finished server process [20458]
+INFO:     Stopping reloader process [18117]

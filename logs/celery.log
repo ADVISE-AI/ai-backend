@@ -1,0 +1,141 @@
+2025-11-21T10:31:20,387 INFO     [db.py:36] Initializing database for PID 18152
+2025-11-21T10:31:20,680 INFO     [db.py:80] ✅ Database initialized for PID 18152 (pool_size=5, max_overflow=10)
+2025-11-21T10:31:22,599 INFO     [bot.py:314] Gemini system prompt loaded successfully
+2025-11-21T10:31:23,532 INFO     [bot.py:327] Gemini model initialized successfully
+2025-11-21T10:31:23,536 INFO     [bot.py:414] LangGraph graph built successfully
+2025-11-21T10:31:23,536 INFO     [bot.py:534] bot.py module loaded successfully
+2025-11-21T10:31:23,656 INFO     [message_deduplicator.py:15] Connecting to Redis at localhost:6379
+2025-11-21T10:31:23,661 INFO     [message_deduplicator.py:18] ✅ Redis connection established
+2025-11-21T10:31:23,705 DEBUG    [functional.py:335] 
+def unlock_chord(self, group_id, callback, interval=0, max_retries=1, result=2, Result=3, GroupResult=4, result_from_tuple=5, **kwargs):
+    return 1
+
+2025-11-21T10:31:23,706 DEBUG    [functional.py:335] 
+def sync_operator_message_to_graph_task(self, phone, message_text):
+    return 1
+
+2025-11-21T10:31:23,706 DEBUG    [functional.py:335] 
+def group(self, tasks, result, group_id, partial_args, add_to_parent=0):
+    return 1
+
+2025-11-21T10:31:23,707 DEBUG    [functional.py:335] 
+def update_message_status_task(status_data):
+    return 1
+
+2025-11-21T10:31:23,707 DEBUG    [functional.py:335] 
+def xmap(task, it):
+    return 1
+
+2025-11-21T10:31:23,707 DEBUG    [functional.py:335] 
+def backend_cleanup():
+    return 1
+
+2025-11-21T10:31:23,708 DEBUG    [functional.py:335] 
+def chain(*args, **kwargs):
+    return 1
+
+2025-11-21T10:31:23,708 DEBUG    [functional.py:335] 
+def xstarmap(task, it):
+    return 1
+
+2025-11-21T10:31:23,709 DEBUG    [functional.py:335] 
+def update_langgraph_state_task(self, phone, updates):
+    return 1
+
+2025-11-21T10:31:23,709 DEBUG    [functional.py:335] 
+def accumulate(self, *args, **kwargs):
+    return 1
+
+2025-11-21T10:31:23,709 DEBUG    [functional.py:335] 
+def check_buffer_task(phone):
+    return 1
+
+2025-11-21T10:31:23,710 DEBUG    [functional.py:335] 
+def process_message_task(self, normalized_data):
+    return 1
+
+2025-11-21T10:31:23,710 DEBUG    [functional.py:335] 
+def chord(self, header, body, partial_args=0, interval=1, countdown=2, max_retries=3, eager=4, **kwargs):
+    return 1
+
+2025-11-21T10:31:23,711 DEBUG    [functional.py:335] 
+def chunks(task, it, n):
+    return 1
+
+2025-11-21T10:31:23,711 DEBUG    [functional.py:335] 
+def cleanup_old_media_task():
+    return 1
+
+ 
+ -------------- celery@engima v5.5.3 (immunity)
+--- ***** ----- 
+-- ******* ---- Linux-6.17.8-arch1-1-x86_64-with-glibc2.42 2025-11-21 10:31:23
+- *** --- * --- 
+- ** ---------- [config]
+- ** ---------- .> app:         webhook:0x7f0ee73e74d0
+- ** ---------- .> transport:   redis://default:**@localhost:6379//
+- ** ---------- .> results:     redis://default:**@localhost:6379/
+- *** --- * --- .> concurrency: 4 (prefork)
+-- ******* ---- .> task events: ON
+--- ***** ----- 
+ -------------- [queues]
+                .> default          exchange=default(direct) key=default
+                .> media            exchange=media(direct) key=media
+                .> messages         exchange=messages(direct) key=messages
+                .> state            exchange=state(direct) key=state
+                .> status           exchange=status(direct) key=status
+
+[tasks]
+  . tasks.check_buffer
+  . tasks.cleanup_old_media
+  . tasks.process_message
+  . tasks.sync_operator_message_to_graph
+  . tasks.update_langgraph_state
+  . tasks.update_message_status
+
+[2025-11-21 10:31:24,590: INFO/MainProcess] Connected to redis://default:**@localhost:6379//
+[2025-11-21 10:31:24,599: INFO/MainProcess] mingle: searching for neighbors
+[2025-11-21 10:31:25,615: INFO/MainProcess] mingle: all alone
+[2025-11-21 10:31:25,655: INFO/MainProcess] celery@engima ready.
+[2025-11-21 10:31:37,908: INFO/MainProcess] Task tasks.check_buffer[a1097fa3-3c36-49f4-bbae-5dce2d8aa6f3] received
+[2025-11-21 10:31:39,841: INFO/ForkPoolWorker-3] Message buffer Redis connection established
+[2025-11-21 10:31:39,842: INFO/ForkPoolWorker-3] Created new message buffer instance
+[2025-11-21 10:31:39,842: INFO/ForkPoolWorker-3] Checking buffer for 917980977361
+[2025-11-21 10:31:39,843: INFO/ForkPoolWorker-3] Debounce time reached for 917980977361 (2.0s)
+[2025-11-21 10:31:39,851: INFO/ForkPoolWorker-3] Retrieved 1 messages for 917980977361
+[2025-11-21 10:31:39,852: INFO/ForkPoolWorker-3] Processing 1 buffered messages for 917980977361
+[2025-11-21 10:31:39,861: INFO/MainProcess] Task tasks.process_message[658e8613-d182-4f43-9f1c-3f5be55cbca2] received
+[2025-11-21 10:31:39,863: INFO/ForkPoolWorker-3] Task tasks.check_buffer[a1097fa3-3c36-49f4-bbae-5dce2d8aa6f3] succeeded in 0.026903544000106194s: None
+[2025-11-21 10:31:39,867: INFO/ForkPoolWorker-1] [Celery-658e8613] Processing wamid.HBgMOTE3OTgwOTc3MzYxFQIAEhgWM0VCMEM0MEQwMUY2QjJBREJEQ0NFNAA= from 917980977361
+[2025-11-21 10:31:39,873: INFO/ForkPoolWorker-1] Processing message for conversation ID: 1
+[2025-11-21 10:31:39,882: INFO/ForkPoolWorker-1] Text for AI processing - Message: okay let me see
+[2025-11-21 10:31:39,882: INFO/ForkPoolWorker-1] Content formatted in 0.00s for 917980977361
+[2025-11-21 10:31:39,882: INFO/ForkPoolWorker-1] Creating LangGraph checkpointer for PID 18254
+[2025-11-21 10:31:39,920: INFO/ForkPoolWorker-1] LangGraph connection test successful
+[2025-11-21 10:31:39,924: INFO/ForkPoolWorker-1] LangGraph DB setup successful
+[2025-11-21 10:31:39,924: INFO/ForkPoolWorker-1] ✅ LangGraph checkpointer ready for PID 18254
+[2025-11-21 10:31:42,959: INFO/ForkPoolWorker-1] Gemini raw response: AIMessage(content=[{'type': 'text', 'text': 'Sure, dekh lijiye. Samples dekh kar bataye, kaunsa type aapko pasand aaya?', 'extras': {'signature': 'CvkBAdHtim/1M7nHpxFE6QXRuIo1jWBxmPuujS+lo2B0NtTTrlmdhSGDjb/ehJCWTzTJ3Y56FEVMQ3KvEGlbzYUQASUwGBQ8pdR09w1cFveXQcCzUT3d3ITFDAzcixYxIDMlssuUvaPExy1WwXxlmC8Npv7akUHsVJwd18SdWF3nWwTS6a426VGnRVgq48y6X85tbOx+Jj/h5Jq4xCtkFd/TMbUIFmrXa7TuwZtbIfJEg+FC3Yx0EC1FcJN3T6CBHCCCYeFH8MAynfo20GRgul4eWZgG4mNIxdQi3YFmt+/j4LpyP1bAvtcqynW9KLNPNFZFBJeJpq2YGL3L'}}], additional_kwargs={}, response_metadata={'prompt_feedback': {'block_reason': 0, 'safety_ratings': []}, 'finish_reason': 'STOP', 'model_name': 'gemini-2.5-flash', 'safety_ratings': [], 'model_provider': 'google_genai'}, id='lc_run--d8a0b06d-ae06-4757-9024-909fcb19ca82-0', usage_metadata={'input_tokens': 8400, 'output_tokens': 75, 'total_tokens': 8475, 'input_token_details': {'cache_read': 0}, 'output_token_details': {'reasoning': 53}})
+[2025-11-21 10:31:42,967: INFO/ForkPoolWorker-1] AI processing complete for 917980977361: 3.02s (1 turns), Total: 3.09s
+[2025-11-21 10:31:42,967: INFO/ForkPoolWorker-1] Final response for 917980977361 after 1 turns: 74 chars
+Response: Sure, dekh lijiye. Samples dekh kar bataye, kaunsa type aapko pasand aaya?
+[2025-11-21 10:31:43,821: INFO/ForkPoolWorker-1] Typing indicator response: 200
+[2025-11-21 10:31:43,822: INFO/ForkPoolWorker-1] Typing indicator sent for message wamid.HBgMOTE3OTgwOTc3MzYxFQIAEhgWM0VCMEM0MEQwMUY2QjJBREJEQ0NFNAA=
+[2025-11-21 10:31:49,816: INFO/ForkPoolWorker-1] Message send response: 200
+[2025-11-21 10:31:49,817: INFO/ForkPoolWorker-1] Message sent successfully to 917980977361
+[2025-11-21 10:31:49,831: INFO/ForkPoolWorker-1] ⏱️ Processed user input in 9.95 seconds
+[2025-11-21 10:31:49,832: INFO/ForkPoolWorker-1] [Celery-658e8613] Completed wamid.HBgMOTE3OTgwOTc3MzYxFQIAEhgWM0VCMEM0MEQwMUY2QjJBREJEQ0NFNAA=
+[2025-11-21 10:31:49,835: INFO/ForkPoolWorker-1] Task tasks.process_message[658e8613-d182-4f43-9f1c-3f5be55cbca2] succeeded in 9.971376315000043s: {'status': 'success', 'phone': '917980977361', 'message_id': 'wamid.HBgMOTE3OTgwOTc3MzYxFQIAEhgWM0VCMEM0MEQwMUY2QjJBREJEQ0NFNAA=', 'task_id': '658e8613-d182-4f43-9f1c-3f5be55cbca2'}
+[2025-11-21 10:31:51,399: INFO/MainProcess] Task tasks.update_message_status[1858d5d8-a8f9-4dac-be96-e909f5b73557] received
+[2025-11-21 10:31:51,406: INFO/ForkPoolWorker-3] Updating status for wamid.HBgMOTE3OTgwOTc3MzYxFQIAERgSQjIxQzhDNzI2Q0UwNThERTdFAA==: sent
+[2025-11-21 10:31:51,419: INFO/ForkPoolWorker-3] Status updated: wamid.HBgMOTE3OTgwOTc3MzYxFQIAERgSQjIxQzhDNzI2Q0UwNThERTdFAA== -> sent
+[2025-11-21 10:31:51,423: INFO/ForkPoolWorker-3] Task tasks.update_message_status[1858d5d8-a8f9-4dac-be96-e909f5b73557] succeeded in 0.02165421199993034s: {'status': 'success', 'message_id': 'wamid.HBgMOTE3OTgwOTc3MzYxFQIAERgSQjIxQzhDNzI2Q0UwNThERTdFAA==', 'new_status': 'sent'}
+[2025-11-21 10:31:51,935: INFO/MainProcess] Task tasks.update_message_status[bd986bc2-6bbd-46ce-98b3-86ed3cbb4a45] received
+[2025-11-21 10:31:51,955: INFO/ForkPoolWorker-3] Updating status for wamid.HBgMOTE3OTgwOTc3MzYxFQIAERgSQjIxQzhDNzI2Q0UwNThERTdFAA==: delivered
+[2025-11-21 10:31:51,959: INFO/ForkPoolWorker-3] Status updated: wamid.HBgMOTE3OTgwOTc3MzYxFQIAERgSQjIxQzhDNzI2Q0UwNThERTdFAA== -> delivered
+[2025-11-21 10:31:51,966: INFO/ForkPoolWorker-3] Task tasks.update_message_status[bd986bc2-6bbd-46ce-98b3-86ed3cbb4a45] succeeded in 0.016100785999924483s: {'status': 'success', 'message_id': 'wamid.HBgMOTE3OTgwOTc3MzYxFQIAERgSQjIxQzhDNzI2Q0UwNThERTdFAA==', 'new_status': 'delivered'}
+[2025-11-21 10:31:57,515: INFO/MainProcess] Task tasks.update_message_status[72a85756-263d-4fd6-85b5-710da3678069] received
+[2025-11-21 10:31:57,521: INFO/ForkPoolWorker-3] Updating status for wamid.HBgMOTE3OTgwOTc3MzYxFQIAERgSQjIxQzhDNzI2Q0UwNThERTdFAA==: read
+[2025-11-21 10:31:57,524: INFO/ForkPoolWorker-3] Status updated: wamid.HBgMOTE3OTgwOTc3MzYxFQIAERgSQjIxQzhDNzI2Q0UwNThERTdFAA== -> read
+[2025-11-21 10:31:57,527: INFO/ForkPoolWorker-3] Task tasks.update_message_status[72a85756-263d-4fd6-85b5-710da3678069] succeeded in 0.00803523500007941s: {'status': 'success', 'message_id': 'wamid.HBgMOTE3OTgwOTc3MzYxFQIAERgSQjIxQzhDNzI2Q0UwNThERTdFAA==', 'new_status': 'read'}
+
+worker: Warm shutdown (MainProcess)
